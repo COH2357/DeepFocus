@@ -7,6 +7,16 @@
   const CACHE_KEY = 'deepfocus:gh:v1';
   const TTL = 6 * 60 * 60 * 1000; // 6 hours
 
+  // ---- panel date: keep the mock dashboard honest ----------------------
+  const panelDate = document.querySelector('[data-js="panel-date"]');
+  if (panelDate) {
+    const now = new Date();
+    panelDate.dateTime = now.toISOString().slice(0, 10);
+    panelDate.textContent = now.toLocaleDateString('en-GB', {
+      weekday: 'short', day: 'numeric', month: 'short'
+    });
+  }
+
   // ---- panel bars: staggered reveal ------------------------------------
   const bars = document.querySelectorAll('.panel .app');
   bars.forEach((el, i) => {
