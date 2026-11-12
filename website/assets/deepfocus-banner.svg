@@ -40,7 +40,7 @@
     <rect x="392" y="436" width="60" height="16" fill="#00E5FF"/><rect x="436" y="392" width="16" height="60" fill="#00E5FF"/>
   </svg>
   
-  <text x="85" y="51" class="txt-cyan" font-size="22" font-weight="700">FOCUSd</text>
+  <text x="85" y="51" class="txt-cyan" font-size="22" font-weight="700">DEEP FOCUS</text>
   
   <text x="1010" y="51" class="txt-dim" font-size="18">[daemon: </text>
   <circle cx="1120" cy="45" r="6" fill="#10B981" />
@@ -56,8 +56,8 @@
     <rect x="392" y="436" width="60" height="16" fill="#00E5FF"/><rect x="436" y="392" width="16" height="60" fill="#00E5FF"/>
   </svg>
   
-  <text x="640" y="300" class="title" text-anchor="middle">Focusd</text>
-  <text x="640" y="350" class="tagline" text-anchor="middle">TERMINAL-BASED FOCUS &amp; TIME TRACKER</text>
+  <text x="640" y="300" class="title" text-anchor="middle">DeepFocus</text>
+  <text x="640" y="350" class="tagline" text-anchor="middle">PRIVATE SCREEN-TIME TRACKER</text>
   <text x="640" y="385" class="txt-dim" font-size="18" text-anchor="middle">Code Fast. Stay Locked In.</text>
   
   <g transform="translate(140, 420)">
@@ -74,7 +74,7 @@
     <rect x="0" y="0" width="400" height="120" fill="url(#glow)" rx="6" />
     <rect x="0" y="0" width="400" height="120" class="border" rx="6" />
     <text x="35" y="55" class="txt-cyan" font-size="28" font-weight="700">&gt;</text>
-    <text x="65" y="55" class="txt-white" font-size="26" font-weight="700">focusd start</text>
+    <text x="65" y="55" class="txt-white" font-size="26" font-weight="700">deepfocus start</text>
     <text x="65" y="85" class="txt-cyan" font-size="14">Tracking active...</text>
     <rect x="65" y="100" width="280" height="4" class="box-dim" rx="2" />
     <rect x="65" y="100" width="210" height="4" class="box-cyan" rx="2" />

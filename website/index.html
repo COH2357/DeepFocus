@@ -7,31 +7,31 @@
 <meta name="theme-color" content="#F0EDE4" media="(prefers-color-scheme: light)">
 <meta name="theme-color" content="#0E0E0E" media="(prefers-color-scheme: dark)">
 
-<title>focusd - Private screen-time tracker for Windows</title>
-<meta name="description" content="focusd is a native Windows screen time tracker and digital wellbeing tool. Track apps and browser tabs, set daily limits, run Pomodoro sessions. Local SQLite storage, no cloud sync, no account. An open-source local alternative to RescueTime, StayFree, and Toggl Track.">
-<meta name="keywords" content="screen time tracker windows, digital wellbeing windows, app usage monitor, browser time tracker, pomodoro timer windows, productivity dashboard, rescuetime alternative, stayfree alternative, toggl track alternative, privacy-first, local, open source, go">
-<meta name="author" content="0xarchit">
-<link rel="canonical" href="https://focusd.0xarchit.is-a.dev/">
+<title>DeepFocus - Private screen-time tracker for Windows</title>
+<meta name="description" content="DeepFocus is a native Windows screen-time tracker with a desktop GUI, CLI and TUI. Track apps and browser tabs, set daily limits, run Pomodoro sessions and keep weekly archives. Local SQLite storage, Chinese/English interface, no cloud sync, no account.">
+<meta name="keywords" content="screen time tracker windows, digital wellbeing windows, app usage monitor, browser time tracker, pomodoro timer windows, productivity dashboard, rescuetime alternative, stayfree alternative, toggl track alternative, privacy-first, local, open source, go, webview2">
+<meta name="author" content="COH2357">
+<link rel="canonical" href="https://coh2357.github.io/DeepFocus/">
 
 <meta property="og:type" content="website">
-<meta property="og:site_name" content="focusd">
-<meta property="og:title" content="focusd - Private screen-time tracker for Windows">
-<meta property="og:description" content="Track apps and browser tabs, set daily limits, run Pomodoro sessions. Local SQLite storage. No account, no cloud sync. Local by design.">
-<meta property="og:url" content="https://focusd.0xarchit.is-a.dev/">
-<meta property="og:image" content="https://focusd.0xarchit.is-a.dev/assets/focusd-banner.jpg">
-<meta property="og:image:alt" content="focusd - Privacy-first digital wellbeing for Windows">
+<meta property="og:site_name" content="DeepFocus">
+<meta property="og:title" content="DeepFocus - Private screen-time tracker for Windows">
+<meta property="og:description" content="A native Windows desktop app for apps and browser tabs, daily limits, Pomodoro and weekly archives. Local SQLite storage. No account, no cloud sync.">
+<meta property="og:url" content="https://coh2357.github.io/DeepFocus/">
+<meta property="og:image" content="https://coh2357.github.io/DeepFocus/assets/deepfocus-banner.jpg">
+<meta property="og:image:alt" content="DeepFocus - Privacy-first digital wellbeing for Windows">
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
 <meta property="og:locale" content="en_US">
 
 <meta name="twitter:card" content="summary_large_image">
-<meta name="twitter:title" content="focusd - Private screen-time tracker for Windows">
-<meta name="twitter:description" content="Native Windows daemon. Local SQLite storage. Nothing leaves your machine.">
-<meta name="twitter:image" content="https://focusd.0xarchit.is-a.dev/assets/focusd-banner.jpg">
-<meta name="twitter:creator" content="@0xarchit">
+<meta name="twitter:title" content="DeepFocus - Private screen-time tracker for Windows">
+<meta name="twitter:description" content="Native Windows desktop app. Local SQLite storage. Nothing leaves your machine.">
+<meta name="twitter:image" content="https://coh2357.github.io/DeepFocus/assets/deepfocus-banner.jpg">
+<meta name="twitter:creator" content="@COH2357">
 
-<link rel="icon" type="image/svg+xml" href="assets/focusd-icon.svg">
-<link rel="apple-touch-icon" href="assets/focusd-icon.svg">
+<link rel="icon" type="image/svg+xml" href="assets/deepfocus-icon.svg">
+<link rel="apple-touch-icon" href="assets/deepfocus-icon.svg">
 
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -43,27 +43,29 @@
 {
   "@context": "https://schema.org",
   "@type": "SoftwareApplication",
-  "name": "focusd",
+  "name": "DeepFocus",
   "operatingSystem": "Windows 10, Windows 11",
   "applicationCategory": "ProductivityApplication",
   "applicationSubCategory": "Screen Time Tracker",
-  "description": "Native Windows screen time tracker and digital wellbeing tool. Local SQLite storage, per-app and per-browser-tab usage, daily limits, Pomodoro, break reminders. No cloud, no telemetry.",
-  "url": "https://focusd.0xarchit.is-a.dev/",
-  "downloadUrl": "https://github.com/0xarchit/focusd/releases/latest",
+  "description": "Native Windows screen-time tracker with a desktop GUI, CLI and TUI. Local SQLite storage, per-app and per-site usage, daily limits, Pomodoro, break reminders, Chinese/English interface and optional weekly archives. No cloud, no telemetry.",
+  "url": "https://coh2357.github.io/DeepFocus/",
+  "downloadUrl": "https://github.com/COH2357/DeepFocus/releases/latest",
   "softwareVersion": "latest",
-  "fileSize": "9MB",
+  "fileSize": "14MB",
   "license": "https://opensource.org/licenses/MIT",
   "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" },
-  "author": { "@type": "Person", "name": "0xarchit", "url": "https://github.com/0xarchit" },
+  "author": { "@type": "Person", "name": "COH2357", "url": "https://github.com/COH2357" },
   "featureList": [
+    "Desktop GUI (WebView2) with Chinese and English",
+    "CLI and terminal UI for the same local database",
     "Per-app time tracking via Win32 syscalls",
-    "Browser tab grouping across Chrome, Firefox, Edge, Brave, Arc",
+    "Browser site grouping across Chrome, Firefox, Edge, Brave and more",
     "Daily per-app time limits",
-    "Pomodoro focus timer",
-    "Break reminders",
+    "Pomodoro focus timer and break reminders",
+    "Optional weekly archive databases",
     "Local SQLite storage - no cloud",
     "CSV and JSON export",
-    "Auto-update via GitHub Releases"
+    "Manual updates only - no auto-download or auto-install"
   ]
 }
 </script>
@@ -73,14 +75,14 @@
   "@context": "https://schema.org",
   "@type": "FAQPage",
   "mainEntity": [
-    { "@type": "Question", "name": "Does focusd send my data anywhere?",
-      "acceptedAnswer": { "@type": "Answer", "text": "No. Every session is written to a local SQLite database at %APPDATA%\\focusd\\focusd.db. The only network call is an optional update check against the GitHub Releases API." } },
-    { "@type": "Question", "name": "How is focusd different from RescueTime, StayFree, or Toggl Track?",
-      "acceptedAnswer": { "@type": "Answer", "text": "focusd has no cloud sync, no account, and no telemetry. Data is written to a local SQLite database on your machine and never leaves it. The competitors listed all require an account and sync data to their servers." } },
-    { "@type": "Question", "name": "Which browsers does focusd track tabs for?",
+    { "@type": "Question", "name": "Does DeepFocus send my data anywhere?",
+      "acceptedAnswer": { "@type": "Answer", "text": "No. Every session is written to a local SQLite database at %APPDATA%\\focusd\\focusd.db. The app makes no network requests, and updates are manual." } },
+    { "@type": "Question", "name": "How is DeepFocus different from RescueTime, StayFree, or Toggl Track?",
+      "acceptedAnswer": { "@type": "Answer", "text": "DeepFocus has no cloud sync, no account, and no telemetry. Data is written to a local SQLite database on your machine and never leaves it. The competitors listed all require an account and sync data to their servers." } },
+    { "@type": "Question", "name": "Which browsers does DeepFocus track sites for?",
       "acceptedAnswer": { "@type": "Answer", "text": "Chrome, Firefox, Edge, Brave, Opera, Vivaldi, Waterfox, Arc, Safari, Whale, Yandex, Thorium, LibreWolf, Chromium, Floorp, and Zen - plus any custom browser executable you add." } },
-    { "@type": "Question", "name": "Is focusd free and open source?",
-      "acceptedAnswer": { "@type": "Answer", "text": "Yes. MIT-licensed, source on GitHub." } }
+    { "@type": "Question", "name": "Is DeepFocus free and open source?",
+      "acceptedAnswer": { "@type": "Answer", "text": "Yes. MIT-licensed, source on GitHub. DeepFocus is a fork of Focusd by 0xarchit." } }
   ]
 }
 </script>
@@ -91,18 +93,18 @@
 <a href="#main" class="skip">Skip to content</a>
 
 <header class="top">
-  <a class="brand" href="/" aria-label="focusd home">
-    <img class="brand__mark" src="assets/focusd-icon.svg" alt="" width="28" height="28" decoding="async">
-    <span class="brand__word">focusd</span>
+  <a class="brand" href="./" aria-label="DeepFocus home">
+    <img class="brand__mark" src="assets/deepfocus-icon.svg" alt="" width="28" height="28" decoding="async">
+    <span class="brand__word">deepfocus</span>
   </a>
   <nav class="top__nav" aria-label="Primary">
     <a href="#capabilities">Capabilities</a>
     <a href="#commands">Commands</a>
     <a href="#compare">Compare</a>
     <a href="#faq">FAQ</a>
-    <a href="https://github.com/0xarchit/focusd" rel="noopener">Source</a>
+    <a href="https://github.com/COH2357/DeepFocus" rel="noopener">Source</a>
   </nav>
-  <a class="cta" href="https://github.com/0xarchit/focusd/releases/latest" rel="noopener">
+  <a class="cta" href="https://github.com/COH2357/DeepFocus/releases/latest" rel="noopener">
     Download <span aria-hidden="true">→</span>
   </a>
 </header>
@@ -113,7 +115,7 @@
   <div class="hero__thesis" data-reveal>
     <p class="eyebrow">
       <span class="dot" aria-hidden="true"></span>
-      <a class="eyebrow__ver" href="https://github.com/0xarchit/focusd/releases/latest" rel="noopener" data-js="version-link">
+      <a class="eyebrow__ver" href="https://github.com/COH2357/DeepFocus/releases/latest" rel="noopener" data-js="version-link">
         <span data-js="version">v1</span>
       </a>
       <span class="eyebrow__sep" aria-hidden="true">·</span> Windows x64
@@ -129,9 +131,10 @@
       Nowhere else.
     </h1>
     <p class="lede">
-      A native Windows daemon that watches the foreground window and writes to a
-      local SQLite file. No account. No cloud. No telemetry. The installer is
-      about 9 MB.
+      A native Windows desktop app that watches the foreground window and writes
+      to a local SQLite file. Chinese and English, light and dark themes, and a
+      terminal UI when you want it. No account. No cloud. No telemetry. The
+      installer is about 14 MB.
     </p>
   </div>
 
@@ -183,19 +186,19 @@
     </aside>
 
     <div class="hero__actions">
-      <a class="btn btn--solid" href="https://github.com/0xarchit/focusd/releases/latest" rel="noopener">
+      <a class="btn btn--solid" href="https://github.com/COH2357/DeepFocus/releases/latest" rel="noopener">
         Download for Windows
       </a>
-      <a class="btn btn--ghost" href="https://github.com/0xarchit/focusd" rel="noopener">
+      <a class="btn btn--ghost" href="https://github.com/COH2357/DeepFocus" rel="noopener">
         View on GitHub
       </a>
     </div>
 
     <dl class="hero__stats" aria-label="At a glance">
-      <div><dt>Installer</dt><dd>~9 MB</dd></div>
-      <div><dt>CLI binary</dt><dd>~12 MB</dd></div>
+      <div><dt>Installer</dt><dd>~14 MB</dd></div>
+      <div><dt>Interface</dt><dd>GUI · CLI · TUI</dd></div>
       <div><dt>Storage</dt><dd>Local SQLite</dd></div>
-      <div><dt>Network</dt><dd>Update check only</dd></div>
+      <div><dt>Network</dt><dd>None</dd></div>
     </dl>
   </div>
 </section>
@@ -219,32 +222,32 @@
       <span class="cap__num">01</span>
       <div>
         <h3>Track</h3>
-        <p>A silent daemon polls the foreground window on a configurable interval (default 5 s) via Win32 syscalls. Per-app and per-browser-tab time land in a local SQLite database. Browser titles are matched against 74 hard-coded categories - YouTube, GitHub, ChatGPT, Reddit, Netflix, Spotify, and so on - so the report reads like a story, not a title dump.</p>
-        <code>focusd stats</code>
+        <p>A silent daemon polls the foreground window on a configurable interval (default 5 s) via Win32 syscalls. Mouse movement, keyboard input and audio playback keep passive sessions - like a long video - counted. Per-app and per-site time land in a local SQLite database; browser titles are matched against 74 built-in categories such as Bilibili, YouTube, GitHub and ChatGPT.</p>
+        <code>deepfocus gui</code>
       </div>
     </li>
     <li class="cap" data-reveal>
       <span class="cap__num">02</span>
       <div>
-        <h3>Limit</h3>
-        <p>Set a per-executable ceiling in minutes. When today's usage crosses the line, a Windows toast notification interrupts you - with a Snooze action that suppresses repeats for the configured snooze window. Limits reset at local midnight. Whitelisted apps are skipped by the tracker entirely - never recorded.</p>
-        <code>focusd limit chrome.exe 60</code>
+        <h3>Understand</h3>
+        <p>The desktop dashboard shows today's total, the last seven days, hourly rhythm, top apps and sites, recent sessions and limits hit. The statistics view covers 7 days, 30 days or a custom range. Optional experimental domain grouping folds every Bilibili video and subdomain into one site entry.</p>
+        <code>deepfocus stats</code>
       </div>
     </li>
     <li class="cap" data-reveal>
       <span class="cap__num">03</span>
       <div>
-        <h3>Focus</h3>
-        <p>A file-backed Pomodoro at <code>%APPDATA%\focusd\pomodoro.json</code> - state survives process restarts. Default 25 min, configurable. Break reminders fire after N minutes of continuous use. Completion arrives as a Windows toast, not a modal that seizes your desktop.</p>
-        <code>focusd focus 45</code>
+        <h3>Protect</h3>
+        <p>Set a per-executable ceiling in minutes. At 80% the limit row warns, at 95% it turns red and a Windows toast interrupts you, with a Snooze action. Limits reset at local midnight. DeepFocus's own processes, the lock screen and Windows shell surfaces are always excluded; you can exclude any other executable and its rows disappear immediately.</p>
+        <code>deepfocus limit chrome.exe 60</code>
       </div>
     </li>
     <li class="cap" data-reveal>
       <span class="cap__num">04</span>
       <div>
-        <h3>Export</h3>
-        <p>Your data leaves only when you say so. Export CSV or JSON from the TUI's Settings tab; files land on your Desktop. Or open <code>%APPDATA%\focusd\focusd.db</code> in any SQLite browser and query it yourself - the schema is documented.</p>
-        <code>Settings → Export → CSV</code>
+        <h3>Keep</h3>
+        <p>Your data leaves only when you say so. Export CSV or JSON from Settings (files land in Downloads), or open <code>%APPDATA%\focusd\focusd.db</code> in any SQLite browser. Turn on long-term history to keep every completed week in its own archive database, without dupes or gaps.</p>
+        <code>Settings → Long-term history</code>
       </div>
     </li>
   </ol>
@@ -254,7 +257,7 @@
   <header class="section__head" data-reveal>
     <span class="section__kicker">Head to head</span>
     <h2 id="compare-h" class="display display--md">Local by default, not by upgrade.</h2>
-    <p class="section__lede">Most trackers ship cloud sync or accounts as the primary mode. focusd doesn't have a cloud path at all.</p>
+    <p class="section__lede">Most trackers ship cloud sync or accounts as the primary mode. deepfocus doesn't have a cloud path at all.</p>
   </header>
 
   <div class="table-wrap" data-reveal>
@@ -269,8 +272,8 @@
       </thead>
       <tbody>
         <tr class="table__row--own">
-          <th scope="row">focusd</th>
-          <td><b>Standalone binary (~9 MB installer)</b></td>
+          <th scope="row">DeepFocus</th>
+          <td><b>Standalone binary (~14 MB installer)</b></td>
           <td><b>None - local SQLite only</b></td>
           <td><span class="chip chip--y">No</span></td>
         </tr>
@@ -294,7 +297,7 @@
         </tr>
       </tbody>
     </table>
-    <p class="table__note">Sources for competing products: their own product pages and public repositories. focusd figures are from this build.</p>
+    <p class="table__note">Sources for competing products: their own product pages and public repositories. DeepFocus figures are from this build.</p>
   </div>
 </section>
 
@@ -305,31 +308,35 @@
   </header>
 
   <div class="commands__grid">
-    <pre class="code" data-reveal aria-label="Core commands"><code><span class="c-com"># daily</span>
-focusd                       <span class="c-com">launch interactive TUI</span>
-focusd start                 <span class="c-com">start background daemon</span>
-focusd stop                  <span class="c-com">graceful shutdown</span>
-focusd status        (s)     <span class="c-com">today's top 5 apps</span>
-focusd stats         (st)    <span class="c-com">full daily breakdown</span>
+    <pre class="code" data-reveal aria-label="Core commands"><code><span class="c-com"># desktop</span>
+deepfocus                    <span class="c-com">open the desktop app</span>
+deepfocus gui                <span class="c-com">open the GUI explicitly</span>
+deepfocus tui                <span class="c-com">terminal UI</span>
+
+<span class="c-com"># daily</span>
+deepfocus start              <span class="c-com">start background daemon</span>
+deepfocus stop               <span class="c-com">graceful shutdown</span>
+deepfocus status        (s)  <span class="c-com">today's top 5 apps</span>
+deepfocus stats         (st) <span class="c-com">full daily breakdown</span>
 
 <span class="c-com"># flow</span>
-focusd pause         (p)     <span class="c-com">pause tracking</span>
-focusd resume        (r)     <span class="c-com">resume tracking</span>
-focusd focus [min]           <span class="c-com">start Pomodoro (default 25)</span>
-focusd stop-timer            <span class="c-com">cancel Pomodoro</span>
-focusd limit &lt;app&gt; &lt;min&gt;     <span class="c-com">daily cap for an executable</span>
+deepfocus pause         (p)  <span class="c-com">pause tracking</span>
+deepfocus resume        (r)  <span class="c-com">resume tracking</span>
+deepfocus focus [min]        <span class="c-com">start Pomodoro (default 25)</span>
+deepfocus stop-timer         <span class="c-com">cancel Pomodoro</span>
+deepfocus limit &lt;app&gt; &lt;min&gt; <span class="c-com">daily cap for an executable</span>
 
 <span class="c-com"># housekeeping</span>
-focusd update                <span class="c-com">verified auto-update</span>
-focusd retention set 14      <span class="c-com">keep 14 days of history</span>
-focusd autostart enable      <span class="c-com">launch daemon at login</span>
-focusd path enable           <span class="c-com">add to user PATH</span>
-focusd browser add zen.exe   <span class="c-com">register a custom browser</span></code></pre>
+deepfocus update             <span class="c-com">open the releases page (manual)</span>
+deepfocus retention set 14   <span class="c-com">keep 14 days of history</span>
+deepfocus autostart enable   <span class="c-com">launch daemon at login</span>
+deepfocus path enable        <span class="c-com">add to user PATH</span>
+deepfocus browser add zen.exe <span class="c-com">register a custom browser</span></code></pre>
 
     <aside class="arch" data-reveal aria-label="Architecture">
       <h3 class="arch__h">How the pieces fit</h3>
       <svg class="arch__svg" role="img"
-           aria-label="Architecture: focusd.exe (CLI + TUI) exchanges 'stop' and 'flush' messages with focusd_daemon.exe over TCP 127.0.0.1:48321. Both processes read and write %APPDATA%\focusd\ which holds focusd.db, config.json, and pomodoro.json."
+           aria-label="Architecture: deepfocus_gui.exe and deepfocus.exe exchange stop and flush messages with deepfocus_daemon.exe over TCP 127.0.0.1:48321. Both processes read and write %APPDATA%\focusd\ which holds focusd.db, config.json, archive\ and pomodoro state."
            viewBox="0 0 820 300" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMidYMid meet">
         <defs>
           <marker id="arch-arrow" viewBox="0 0 10 10" refX="9" refY="5"
@@ -345,12 +352,12 @@ focusd browser add zen.exe   <span class="c-com">register a custom browser</span
 
         <!-- Left process box -->
         <rect class="arch__box arch__box--own" x="20" y="46" width="240" height="92" rx="12"/>
-        <text class="arch__t arch__t--head" x="140" y="82" text-anchor="middle">focusd.exe</text>
-        <text class="arch__t arch__t--sub"  x="140" y="106" text-anchor="middle">CLI + TUI</text>
+        <text class="arch__t arch__t--head" x="140" y="82" text-anchor="middle">deepfocus_gui.exe</text>
+        <text class="arch__t arch__t--sub"  x="140" y="106" text-anchor="middle">desktop UI (WebView2)</text>
 
         <!-- Right process box -->
         <rect class="arch__box" x="560" y="46" width="240" height="92" rx="12"/>
-        <text class="arch__t arch__t--head" x="680" y="82" text-anchor="middle">focusd_daemon.exe</text>
+        <text class="arch__t arch__t--head" x="680" y="82" text-anchor="middle">deepfocus_daemon.exe</text>
         <text class="arch__t arch__t--sub"  x="680" y="106" text-anchor="middle">windowsgui, no UI</text>
 
         <!-- Top arrow: → "stop" -->
@@ -368,11 +375,13 @@ focusd browser add zen.exe   <span class="c-com">register a custom browser</span
         <!-- Storage box -->
         <rect class="arch__box" x="80" y="212" width="660" height="72" rx="12"/>
         <text class="arch__t arch__t--sub"  x="410" y="238" text-anchor="middle">%APPDATA%\focusd\</text>
-        <text class="arch__t arch__t--head" x="410" y="262" text-anchor="middle">focusd.db · config.json · pomodoro.json</text>
+        <text class="arch__t arch__t--head" x="410" y="262" text-anchor="middle">focusd.db · config.json · archive\</text>
       </svg>
       <p class="arch__note">
-        The CLI calls <code>flush</code> over local TCP before every report,
-        so <code>stats</code> is always caught up on the in-flight session.
+        The desktop and terminal clients call <code>flush</code> over local TCP
+        before every report, so stats are always caught up on the in-flight
+        session. <code>deepfocus.exe</code> provides the CLI and TUI against the
+        same daemon and database.
       </p>
     </aside>
   </div>
@@ -381,20 +390,20 @@ focusd browser add zen.exe   <span class="c-com">register a custom browser</span
 <section class="trust" aria-labelledby="trust-h">
   <div data-reveal>
     <span class="section__kicker">The quiet part, loud</span>
-    <h2 id="trust-h" class="display display--md">One network call. And you can turn it off.</h2>
+    <h2 id="trust-h" class="display display--md">No network calls. Not even for updates.</h2>
     <p>
-      The only outbound request focusd ever makes is an update check against
-      <code>api.github.com/repos/0xarchit/focusd/releases/latest</code>.
-      If you never call <code>focusd update</code>, focusd never opens a
-      socket. Everything else - tracking, limits, Pomodoro, export - stays
-      on your machine.
+      DeepFocus does not contact GitHub, send telemetry, or check for updates in
+      the background. Choosing <code>deepfocus update</code> simply opens the
+      releases page in your browser; nothing is downloaded or installed by the
+      app. Tracking, limits, Pomodoro, archives and export all stay on your
+      machine.
     </p>
   </div>
   <ul class="trust__list" data-reveal aria-label="Guarantees">
     <li><b>MIT licensed.</b> Read the source, ship it in a fork, resell it if you like.</li>
     <li><b>No account.</b> There is no server to sign up for.</li>
     <li><b>No analytics.</b> No page pings, no crash uploads, no "improve the product" checkbox.</li>
-    <li><b>You control updates.</b> The updater only runs when you invoke <code>focusd update</code>. Nothing checks silently in the background.</li>
+    <li><b>You control updates.</b> There is no updater. <code>deepfocus update</code> opens the releases page, and you decide whether to download anything.</li>
   </ul>
 </section>
 
@@ -406,16 +415,16 @@ focusd browser add zen.exe   <span class="c-com">register a custom browser</span
 
   <div class="faq__list" data-reveal>
     <details>
-      <summary>Does focusd send my data anywhere?</summary>
-      <p>No. Sessions are written to <code>%APPDATA%\focusd\focusd.db</code>. The only outbound network call is an optional update check against the GitHub Releases API.</p>
+      <summary>Does DeepFocus send my data anywhere?</summary>
+      <p>No. Sessions are written to <code>%APPDATA%\focusd\focusd.db</code>. The app makes no network requests. There is no telemetry, account or cloud sync.</p>
     </details>
     <details>
       <summary>How is this different from RescueTime, StayFree, or Toggl Track?</summary>
-      <p>focusd has no cloud sync, no account, and no telemetry - all three competitors listed require an account and sync your data to their servers. focusd writes tracking data only to a local SQLite database and never leaves the machine.</p>
+      <p>DeepFocus has no cloud sync, no account, and no telemetry - all three competitors listed require an account and sync your data to their servers. DeepFocus writes tracking data only to a local SQLite database and never leaves the machine.</p>
     </details>
     <details>
-      <summary>Which browsers can it group tabs for?</summary>
-      <p>Chrome, Firefox, Edge, Brave, Opera, Vivaldi, Waterfox, Arc, Safari, Whale, Yandex, Thorium, LibreWolf, Chromium, Floorp, Zen, and any custom executable you register with <code>focusd browser add</code>.</p>
+      <summary>Which browsers can it group sites for?</summary>
+      <p>Chrome, Firefox, Edge, Brave, Opera, Vivaldi, Waterfox, Arc, Safari, Whale, Yandex, Thorium, LibreWolf, Chromium, Floorp, Zen, and any custom executable you register with <code>deepfocus browser add</code>. Browser windows expose titles rather than full URLs, so site names are matched from titles and, optionally, grouped by domain.</p>
     </details>
     <details>
       <summary>Does it run on macOS or Linux?</summary>
@@ -423,11 +432,15 @@ focusd browser add zen.exe   <span class="c-com">register a custom browser</span
     </details>
     <details>
       <summary>What happens to my data if I uninstall?</summary>
-      <p>The installer leaves <code>%APPDATA%\focusd\</code> in place so you can reinstall without losing history. Delete that directory manually if you want a clean slate.</p>
+      <p>The installer leaves <code>%APPDATA%\focusd\</code> in place so you can reinstall without losing history. Long-term archives live in <code>%APPDATA%\focusd\archive\</code>. Delete that directory manually if you want a clean slate.</p>
     </details>
     <details>
-      <summary>How does the auto-update work?</summary>
-      <p>Run <code>focusd update</code>. It queries <code>api.github.com/repos/0xarchit/focusd/releases/latest</code>, downloads <code>focusd_setup.exe</code> for that tag, stops the running daemon, and launches the NSIS installer with a UAC elevation prompt. The daemon restarts after the install completes. Nothing runs automatically - you invoke it when you want it.</p>
+      <summary>How do updates work?</summary>
+      <p>There is no auto-updater. <code>deepfocus update</code> opens the GitHub releases page in your browser; DeepFocus never downloads or runs an installer on its own. You choose the build and install it manually.</p>
+    </details>
+    <details>
+      <summary>Does it support Chinese?</summary>
+      <p>Yes. The desktop app ships with full Simplified Chinese and English text, follows your system language on first launch, and lets you switch at any time.</p>
     </details>
   </div>
 </section>
@@ -439,34 +452,34 @@ focusd browser add zen.exe   <span class="c-com">register a custom browser</span
     <em>That's the whole product.</em>
   </h2>
   <div class="close__actions">
-    <a class="btn btn--solid btn--lg" href="https://github.com/0xarchit/focusd/releases/latest" rel="noopener">Download focusd</a>
-    <a class="btn btn--ghost btn--lg" href="https://github.com/0xarchit/focusd" rel="noopener">Read the source</a>
+    <a class="btn btn--solid btn--lg" href="https://github.com/COH2357/DeepFocus/releases/latest" rel="noopener">Download DeepFocus</a>
+    <a class="btn btn--ghost btn--lg" href="https://github.com/COH2357/DeepFocus" rel="noopener">Read the source</a>
   </div>
-  <p class="close__foot"><code>focusd_setup.exe</code> · Windows 10 / 11 · x64 · MIT</p>
+  <p class="close__foot"><code>deepfocus_setup.exe</code> · Windows 10 / 11 · x64 · MIT</p>
 </section>
 
 </main>
 
 <footer class="foot">
   <div class="foot__row">
-    <a class="brand brand--sm" href="/" aria-label="focusd home">
-      <img class="brand__mark" src="assets/focusd-icon.svg" alt="" width="24" height="24" decoding="async">
-      <span class="brand__word">focusd</span>
+    <a class="brand brand--sm" href="./" aria-label="DeepFocus home">
+      <img class="brand__mark" src="assets/deepfocus-icon.svg" alt="" width="24" height="24" decoding="async">
+      <span class="brand__word">deepfocus</span>
     </a>
-    <p class="foot__note">Built by <a href="https://github.com/0xarchit" rel="noopener">0xarchit</a>. Native Win32. MIT licensed.</p>
+    <p class="foot__note">Built by <a href="https://github.com/COH2357" rel="noopener">COH2357</a>. Fork of <a href="https://github.com/0xarchit/Focusd" rel="noopener">Focusd</a> by 0xarchit. MIT licensed.</p>
   </div>
   <nav class="foot__nav" aria-label="Footer">
-    <a href="https://github.com/0xarchit/focusd" rel="noopener">GitHub</a>
-    <a href="https://github.com/0xarchit/focusd/releases" rel="noopener">Releases</a>
-    <a href="https://github.com/0xarchit/focusd/blob/main/LICENSE" rel="noopener">License</a>
-    <a href="https://github.com/0xarchit/focusd/issues" rel="noopener">Report an issue</a>
+    <a href="https://github.com/COH2357/DeepFocus" rel="noopener">GitHub</a>
+    <a href="https://github.com/COH2357/DeepFocus/releases" rel="noopener">Releases</a>
+    <a href="https://github.com/COH2357/DeepFocus/blob/main/LICENSE" rel="noopener">License</a>
+    <a href="https://github.com/COH2357/DeepFocus/issues" rel="noopener">Report an issue</a>
   </nav>
 </footer>
 
 <!-- Floating star-the-repo widget. Hidden until the API returns a count so the
      first paint doesn't show a placeholder. -->
-<a class="starw" href="https://github.com/0xarchit/focusd" rel="noopener"
-   aria-label="Star focusd on GitHub" data-js="starw" hidden>
+<a class="starw" href="https://github.com/COH2357/DeepFocus" rel="noopener"
+   aria-label="Star DeepFocus on GitHub" data-js="starw" hidden>
   <span class="starw__spark" aria-hidden="true"></span>
   <svg class="starw__icon" viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
     <path fill="currentColor" d="M12 2.5l2.9 6.9 7.6.6-5.8 4.9 1.8 7.3L12 18.4 5.5 22.2l1.8-7.3-5.8-4.9 7.6-.6L12 2.5z"/>

@@ -1,10 +1,10 @@
-// focusd landing — hero panel animation + live GitHub numbers.
+// deepfocus landing — hero panel animation + live GitHub numbers.
 // no framework, no libs. respects prefers-reduced-motion.
 
 (() => {
   const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
-  const GH_REPO = '0xarchit/focusd';
-  const CACHE_KEY = 'focusd:gh:v1';
+  const GH_REPO = 'COH2357/DeepFocus';
+  const CACHE_KEY = 'deepfocus:gh:v1';
   const TTL = 6 * 60 * 60 * 1000; // 6 hours
 
   // ---- panel bars: staggered reveal ------------------------------------

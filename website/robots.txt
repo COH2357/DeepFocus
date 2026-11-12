@@ -1,4 +1,4 @@
 User-agent: *
 Allow: /
 
-Sitemap: https://focusd.0xarchit.is-a.dev/sitemap.xml
+Sitemap: https://coh2357.github.io/DeepFocus/sitemap.xml
