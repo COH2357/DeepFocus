@@ -1,0 +1,185 @@
+package coreapi
+
+import (
+	"encoding/json"
+	"fmt"
+	"focusd/storage"
+	"log"
+	"os"
+	"path/filepath"
+	"time"
+)
+
+const defaultPomodoroMinutes = 25
+
+// MaxPomodoroMinutes bounds the timer. Larger values can overflow
+// time.Duration(minutes)*time.Minute into the negative, which made the timer
+// read as already complete the moment it started.
+const MaxPomodoroMinutes = 1440
+
+type PomodoroState struct {
+	Active    bool      `json:"active"`
+	StartTime time.Time `json:"start_time"`
+	Duration  int       `json:"duration_minutes"`
+	Notified  bool      `json:"notified"`
+}
+
+func LoadPomodoroStateFresh() *PomodoroState {
+	state, _ := LoadPomodoroStateRaw()
+	return state
+}
+
+func LoadPomodoroStateRaw() (*PomodoroState, string) {
+	state := &PomodoroState{Duration: defaultPomodoroMinutes}
+	dataStr, err := storage.GetConfig("pomodoro_state")
+	if err == nil && dataStr != "" {
+		if err := json.Unmarshal([]byte(dataStr), state); err != nil {
+			log.Printf("WARN: failed to parse pomodoro state: %v", err)
+		}
+		return state, dataStr
+	}
+
+	// Migrate from legacy pomodoro.json if present
+	appData := os.Getenv("APPDATA")
+	if appData != "" {
+		legacyPath := filepath.Join(appData, "focusd", "pomodoro.json")
+		if bytes, readErr := os.ReadFile(legacyPath); readErr == nil {
+			var legacyState PomodoroState
+			if unmarshalErr := json.Unmarshal(bytes, &legacyState); unmarshalErr == nil {
+				if setErr := storage.SetConfig("pomodoro_state", string(bytes)); setErr == nil {
+					os.Remove(legacyPath)
+				}
+				return &legacyState, string(bytes)
+			}
+		}
+	}
+
+	return state, ""
+}
+
+func SavePomodoroState(state *PomodoroState) error {
+	data, err := json.Marshal(state)
+	if err != nil {
+		return err
+	}
+	return storage.SetConfig("pomodoro_state", string(data))
+}
+
+func SavePomodoroStateCAS(expectedRaw string, state *PomodoroState) (bool, error) {
+	data, err := json.Marshal(state)
+	if err != nil {
+		return false, err
+	}
+	return storage.CompareAndSwapConfig("pomodoro_state", expectedRaw, string(data))
+}
+
+func StartPomodoro(minutes int) error {
+	for i := 0; i < 5; i++ {
+		existing, raw := LoadPomodoroStateRaw()
+		if existing.Active {
+			return fmt.Errorf("pomodoro already active")
+		}
+
+		if minutes <= 0 {
+			minutes = defaultPomodoroMinutes
+		}
+		if minutes > MaxPomodoroMinutes {
+			minutes = MaxPomodoroMinutes
+		}
+
+		state := &PomodoroState{
+			Active:    true,
+			StartTime: time.Now(),
+			Duration:  minutes,
+			Notified:  false,
+		}
+
+		ok, err := SavePomodoroStateCAS(raw, state)
+		if err != nil {
+			return err
+		}
+		if ok {
+			return nil
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+	return fmt.Errorf("failed to start pomodoro due to lock contention")
+}
+
+func StopPomodoro() error {
+	for i := 0; i < 5; i++ {
+		_, raw := LoadPomodoroStateRaw()
+		state := &PomodoroState{
+			Active:    false,
+			StartTime: time.Time{},
+			Duration:  defaultPomodoroMinutes,
+			Notified:  false,
+		}
+		ok, err := SavePomodoroStateCAS(raw, state)
+		if err != nil {
+			return err
+		}
+		if ok {
+			return nil
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+	return fmt.Errorf("failed to stop pomodoro due to lock contention")
+}
+
+func GetPomodoroStatus() (active bool, remaining time.Duration, total int) {
+	state := LoadPomodoroStateFresh()
+	if !state.Active {
+		return false, 0, 0
+	}
+
+	elapsed := time.Since(state.StartTime)
+	totalDuration := time.Duration(state.Duration) * time.Minute
+	remaining = totalDuration - elapsed
+
+	if remaining <= 0 {
+		return true, 0, state.Duration
+	}
+
+	return true, remaining, state.Duration
+}
+
+// CheckPomodoroAndNotify completes an expired timer. The completion is
+// announced before the state is committed: a throttled toast must not mark the
+// timer notified, or the single completion alert would be lost. A lost CAS can
+// at worst re-announce, and any writer that beats it either marks the timer
+// notified itself or starts a new one.
+func CheckPomodoroAndNotify(notifyFn func(title, msg string) bool) {
+	for i := 0; i < 5; i++ {
+		state, raw := LoadPomodoroStateRaw()
+		if !state.Active || state.Notified {
+			return
+		}
+
+		elapsed := time.Since(state.StartTime)
+		totalDuration := time.Duration(state.Duration) * time.Minute
+
+		if elapsed < totalDuration {
+			return
+		}
+
+		if notifyFn != nil && !notifyFn("Pomodoro Complete!", "Great work! Take a break.") {
+			// The toast was throttled; leave the timer un-notified so the next
+			// check retries instead of dropping the only completion alert.
+			return
+		}
+
+		state.Notified = true
+		state.Active = false
+		ok, err := SavePomodoroStateCAS(raw, state)
+		if err != nil {
+			log.Printf("ERROR: failed to save pomodoro state: %v", err)
+			return
+		}
+		if !ok {
+			time.Sleep(10 * time.Millisecond)
+			continue
+		}
+		return
+	}
+}

@@ -1,0 +1,480 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="color-scheme" content="light dark">
+<meta name="theme-color" content="#F0EDE4" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0E0E0E" media="(prefers-color-scheme: dark)">
+
+<title>focusd - Private screen-time tracker for Windows</title>
+<meta name="description" content="focusd is a native Windows screen time tracker and digital wellbeing tool. Track apps and browser tabs, set daily limits, run Pomodoro sessions. Local SQLite storage, no cloud sync, no account. An open-source local alternative to RescueTime, StayFree, and Toggl Track.">
+<meta name="keywords" content="screen time tracker windows, digital wellbeing windows, app usage monitor, browser time tracker, pomodoro timer windows, productivity dashboard, rescuetime alternative, stayfree alternative, toggl track alternative, privacy-first, local, open source, go">
+<meta name="author" content="0xarchit">
+<link rel="canonical" href="https://focusd.0xarchit.is-a.dev/">
+
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="focusd">
+<meta property="og:title" content="focusd - Private screen-time tracker for Windows">
+<meta property="og:description" content="Track apps and browser tabs, set daily limits, run Pomodoro sessions. Local SQLite storage. No account, no cloud sync. Local by design.">
+<meta property="og:url" content="https://focusd.0xarchit.is-a.dev/">
+<meta property="og:image" content="https://focusd.0xarchit.is-a.dev/assets/focusd-banner.jpg">
+<meta property="og:image:alt" content="focusd - Privacy-first digital wellbeing for Windows">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:locale" content="en_US">
+
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="focusd - Private screen-time tracker for Windows">
+<meta name="twitter:description" content="Native Windows daemon. Local SQLite storage. Nothing leaves your machine.">
+<meta name="twitter:image" content="https://focusd.0xarchit.is-a.dev/assets/focusd-banner.jpg">
+<meta name="twitter:creator" content="@0xarchit">
+
+<link rel="icon" type="image/svg+xml" href="assets/focusd-icon.svg">
+<link rel="apple-touch-icon" href="assets/focusd-icon.svg">
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wdth,wght@10..48,75..100,400..800&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+
+<link rel="stylesheet" href="style.css">
+
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "SoftwareApplication",
+  "name": "focusd",
+  "operatingSystem": "Windows 10, Windows 11",
+  "applicationCategory": "ProductivityApplication",
+  "applicationSubCategory": "Screen Time Tracker",
+  "description": "Native Windows screen time tracker and digital wellbeing tool. Local SQLite storage, per-app and per-browser-tab usage, daily limits, Pomodoro, break reminders. No cloud, no telemetry.",
+  "url": "https://focusd.0xarchit.is-a.dev/",
+  "downloadUrl": "https://github.com/0xarchit/focusd/releases/latest",
+  "softwareVersion": "latest",
+  "fileSize": "9MB",
+  "license": "https://opensource.org/licenses/MIT",
+  "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" },
+  "author": { "@type": "Person", "name": "0xarchit", "url": "https://github.com/0xarchit" },
+  "featureList": [
+    "Per-app time tracking via Win32 syscalls",
+    "Browser tab grouping across Chrome, Firefox, Edge, Brave, Arc",
+    "Daily per-app time limits",
+    "Pomodoro focus timer",
+    "Break reminders",
+    "Local SQLite storage - no cloud",
+    "CSV and JSON export",
+    "Auto-update via GitHub Releases"
+  ]
+}
+</script>
+
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  "mainEntity": [
+    { "@type": "Question", "name": "Does focusd send my data anywhere?",
+      "acceptedAnswer": { "@type": "Answer", "text": "No. Every session is written to a local SQLite database at %APPDATA%\\focusd\\focusd.db. The only network call is an optional update check against the GitHub Releases API." } },
+    { "@type": "Question", "name": "How is focusd different from RescueTime, StayFree, or Toggl Track?",
+      "acceptedAnswer": { "@type": "Answer", "text": "focusd has no cloud sync, no account, and no telemetry. Data is written to a local SQLite database on your machine and never leaves it. The competitors listed all require an account and sync data to their servers." } },
+    { "@type": "Question", "name": "Which browsers does focusd track tabs for?",
+      "acceptedAnswer": { "@type": "Answer", "text": "Chrome, Firefox, Edge, Brave, Opera, Vivaldi, Waterfox, Arc, Safari, Whale, Yandex, Thorium, LibreWolf, Chromium, Floorp, and Zen - plus any custom browser executable you add." } },
+    { "@type": "Question", "name": "Is focusd free and open source?",
+      "acceptedAnswer": { "@type": "Answer", "text": "Yes. MIT-licensed, source on GitHub." } }
+  ]
+}
+</script>
+</head>
+
+<body>
+
+<a href="#main" class="skip">Skip to content</a>
+
+<header class="top">
+  <a class="brand" href="/" aria-label="focusd home">
+    <img class="brand__mark" src="assets/focusd-icon.svg" alt="" width="28" height="28" decoding="async">
+    <span class="brand__word">focusd</span>
+  </a>
+  <nav class="top__nav" aria-label="Primary">
+    <a href="#capabilities">Capabilities</a>
+    <a href="#commands">Commands</a>
+    <a href="#compare">Compare</a>
+    <a href="#faq">FAQ</a>
+    <a href="https://github.com/0xarchit/focusd" rel="noopener">Source</a>
+  </nav>
+  <a class="cta" href="https://github.com/0xarchit/focusd/releases/latest" rel="noopener">
+    Download <span aria-hidden="true">→</span>
+  </a>
+</header>
+
+<main id="main">
+
+<section class="hero" aria-labelledby="hero-h">
+  <div class="hero__thesis" data-reveal>
+    <p class="eyebrow">
+      <span class="dot" aria-hidden="true"></span>
+      <a class="eyebrow__ver" href="https://github.com/0xarchit/focusd/releases/latest" rel="noopener" data-js="version-link">
+        <span data-js="version">v1</span>
+      </a>
+      <span class="eyebrow__sep" aria-hidden="true">·</span> Windows x64
+      <span class="eyebrow__sep" aria-hidden="true">·</span> MIT
+      <span class="eyebrow__dl" data-js="downloads-wrap" hidden>
+        <span class="eyebrow__sep" aria-hidden="true">·</span>
+        <span data-js="downloads">0</span> downloads
+      </span>
+    </p>
+    <h1 id="hero-h" class="display">
+      Your screen time,<br>
+      <em>on your machine.</em><br>
+      Nowhere else.
+    </h1>
+    <p class="lede">
+      A native Windows daemon that watches the foreground window and writes to a
+      local SQLite file. No account. No cloud. No telemetry. The installer is
+      about 9 MB.
+    </p>
+  </div>
+
+  <div class="hero__side" data-reveal data-reveal-delay="1">
+    <aside class="panel" aria-label="Sample dashboard">
+      <header class="panel__head">
+        <span class="panel__title">Today · <time datetime="2026-07-18">Thu, 18 Jul</time></span>
+        <span class="panel__meta">local · never syncs</span>
+      </header>
+
+      <div class="panel__total">
+        <span class="panel__label">Tracked</span>
+        <span class="panel__number" data-count-to="284" aria-live="polite">0</span>
+        <span class="panel__unit">min</span>
+      </div>
+
+      <ol class="apps" aria-label="Top applications today">
+        <li class="app" style="--pct:88">
+          <span class="app__name">code.exe</span>
+          <span class="app__bar"><i></i></span>
+          <span class="app__t">2h 30m</span>
+        </li>
+        <li class="app" style="--pct:52">
+          <span class="app__name">chrome.exe <em>· GitHub</em></span>
+          <span class="app__bar"><i></i></span>
+          <span class="app__t">1h 27m</span>
+        </li>
+        <li class="app" style="--pct:34">
+          <span class="app__name">windowsterminal.exe</span>
+          <span class="app__bar"><i></i></span>
+          <span class="app__t">57m</span>
+        </li>
+        <li class="app" style="--pct:22">
+          <span class="app__name">chrome.exe <em>· YouTube</em></span>
+          <span class="app__bar"><i></i></span>
+          <span class="app__t">38m</span>
+        </li>
+        <li class="app" style="--pct:14">
+          <span class="app__name">slack.exe</span>
+          <span class="app__bar"><i></i></span>
+          <span class="app__t">22m</span>
+        </li>
+      </ol>
+
+      <footer class="panel__foot">
+        <span class="tick" aria-hidden="true"></span>
+        This data never left your machine.
+      </footer>
+    </aside>
+
+    <div class="hero__actions">
+      <a class="btn btn--solid" href="https://github.com/0xarchit/focusd/releases/latest" rel="noopener">
+        Download for Windows
+      </a>
+      <a class="btn btn--ghost" href="https://github.com/0xarchit/focusd" rel="noopener">
+        View on GitHub
+      </a>
+    </div>
+
+    <dl class="hero__stats" aria-label="At a glance">
+      <div><dt>Installer</dt><dd>~9 MB</dd></div>
+      <div><dt>CLI binary</dt><dd>~12 MB</dd></div>
+      <div><dt>Storage</dt><dd>Local SQLite</dd></div>
+      <div><dt>Network</dt><dd>Update check only</dd></div>
+    </dl>
+  </div>
+</section>
+
+<section class="strip" aria-label="Positioning" data-reveal>
+  <p>
+    A free alternative to <span>RescueTime</span> · <span>StayFree</span> ·
+    <span>Toggl Track</span> - for people who would rather not hand their
+    keystrokes to a SaaS.
+  </p>
+</section>
+
+<section id="capabilities" class="caps" aria-labelledby="caps-h">
+  <header class="section__head" data-reveal>
+    <span class="section__kicker">The workflow</span>
+    <h2 id="caps-h" class="display display--md">Four things it does, in the order you'd meet them.</h2>
+  </header>
+
+  <ol class="caps__list">
+    <li class="cap" data-reveal>
+      <span class="cap__num">01</span>
+      <div>
+        <h3>Track</h3>
+        <p>A silent daemon polls the foreground window on a configurable interval (default 5 s) via Win32 syscalls. Per-app and per-browser-tab time land in a local SQLite database. Browser titles are matched against 74 hard-coded categories - YouTube, GitHub, ChatGPT, Reddit, Netflix, Spotify, and so on - so the report reads like a story, not a title dump.</p>
+        <code>focusd stats</code>
+      </div>
+    </li>
+    <li class="cap" data-reveal>
+      <span class="cap__num">02</span>
+      <div>
+        <h3>Limit</h3>
+        <p>Set a per-executable ceiling in minutes. When today's usage crosses the line, a Windows toast notification interrupts you - with a Snooze action that suppresses repeats for the configured snooze window. Limits reset at local midnight. Whitelisted apps are skipped by the tracker entirely - never recorded.</p>
+        <code>focusd limit chrome.exe 60</code>
+      </div>
+    </li>
+    <li class="cap" data-reveal>
+      <span class="cap__num">03</span>
+      <div>
+        <h3>Focus</h3>
+        <p>A file-backed Pomodoro at <code>%APPDATA%\focusd\pomodoro.json</code> - state survives process restarts. Default 25 min, configurable. Break reminders fire after N minutes of continuous use. Completion arrives as a Windows toast, not a modal that seizes your desktop.</p>
+        <code>focusd focus 45</code>
+      </div>
+    </li>
+    <li class="cap" data-reveal>
+      <span class="cap__num">04</span>
+      <div>
+        <h3>Export</h3>
+        <p>Your data leaves only when you say so. Export CSV or JSON from the TUI's Settings tab; files land on your Desktop. Or open <code>%APPDATA%\focusd\focusd.db</code> in any SQLite browser and query it yourself - the schema is documented.</p>
+        <code>Settings → Export → CSV</code>
+      </div>
+    </li>
+  </ol>
+</section>
+
+<section id="compare" class="compare" aria-labelledby="compare-h">
+  <header class="section__head" data-reveal>
+    <span class="section__kicker">Head to head</span>
+    <h2 id="compare-h" class="display display--md">Local by default, not by upgrade.</h2>
+    <p class="section__lede">Most trackers ship cloud sync or accounts as the primary mode. focusd doesn't have a cloud path at all.</p>
+  </header>
+
+  <div class="table-wrap" data-reveal>
+    <table class="table" aria-describedby="compare-h">
+      <thead>
+        <tr>
+          <th scope="col">App</th>
+          <th scope="col">Distribution</th>
+          <th scope="col">Sync model</th>
+          <th scope="col">Account required</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr class="table__row--own">
+          <th scope="row">focusd</th>
+          <td><b>Standalone binary (~9 MB installer)</b></td>
+          <td><b>None - local SQLite only</b></td>
+          <td><span class="chip chip--y">No</span></td>
+        </tr>
+        <tr>
+          <th scope="row">StayFree</th>
+          <td>Microsoft Store / UWP + Electron desktop</td>
+          <td>Cross-device sync</td>
+          <td><span class="chip">Yes</span></td>
+        </tr>
+        <tr>
+          <th scope="row">Toggl Track</th>
+          <td>Native C++/.NET desktop client</td>
+          <td>Cloud sync (Toggl account)</td>
+          <td><span class="chip">Yes</span></td>
+        </tr>
+        <tr>
+          <th scope="row">RescueTime</th>
+          <td>Native Windows client + web dashboard</td>
+          <td>Cloud sync (RescueTime account)</td>
+          <td><span class="chip">Yes</span></td>
+        </tr>
+      </tbody>
+    </table>
+    <p class="table__note">Sources for competing products: their own product pages and public repositories. focusd figures are from this build.</p>
+  </div>
+</section>
+
+<section id="commands" class="commands" aria-labelledby="cmd-h">
+  <header class="section__head" data-reveal>
+    <span class="section__kicker">The whole surface</span>
+    <h2 id="cmd-h" class="display display--md">One binary. Everything through the shell.</h2>
+  </header>
+
+  <div class="commands__grid">
+    <pre class="code" data-reveal aria-label="Core commands"><code><span class="c-com"># daily</span>
+focusd                       <span class="c-com">launch interactive TUI</span>
+focusd start                 <span class="c-com">start background daemon</span>
+focusd stop                  <span class="c-com">graceful shutdown</span>
+focusd status        (s)     <span class="c-com">today's top 5 apps</span>
+focusd stats         (st)    <span class="c-com">full daily breakdown</span>
+
+<span class="c-com"># flow</span>
+focusd pause         (p)     <span class="c-com">pause tracking</span>
+focusd resume        (r)     <span class="c-com">resume tracking</span>
+focusd focus [min]           <span class="c-com">start Pomodoro (default 25)</span>
+focusd stop-timer            <span class="c-com">cancel Pomodoro</span>
+focusd limit &lt;app&gt; &lt;min&gt;     <span class="c-com">daily cap for an executable</span>
+
+<span class="c-com"># housekeeping</span>
+focusd update                <span class="c-com">verified auto-update</span>
+focusd retention set 14      <span class="c-com">keep 14 days of history</span>
+focusd autostart enable      <span class="c-com">launch daemon at login</span>
+focusd path enable           <span class="c-com">add to user PATH</span>
+focusd browser add zen.exe   <span class="c-com">register a custom browser</span></code></pre>
+
+    <aside class="arch" data-reveal aria-label="Architecture">
+      <h3 class="arch__h">How the pieces fit</h3>
+      <svg class="arch__svg" role="img"
+           aria-label="Architecture: focusd.exe (CLI + TUI) exchanges 'stop' and 'flush' messages with focusd_daemon.exe over TCP 127.0.0.1:48321. Both processes read and write %APPDATA%\focusd\ which holds focusd.db, config.json, and pomodoro.json."
+           viewBox="0 0 820 300" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMidYMid meet">
+        <defs>
+          <marker id="arch-arrow" viewBox="0 0 10 10" refX="9" refY="5"
+                  markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+            <path d="M0,0 L10,5 L0,10 z" fill="currentColor"/>
+          </marker>
+        </defs>
+
+        <!-- IPC label -->
+        <text class="arch__t arch__t--lbl" x="410" y="30" text-anchor="middle">
+          TCP 127.0.0.1:48321
+        </text>
+
+        <!-- Left process box -->
+        <rect class="arch__box arch__box--own" x="20" y="46" width="240" height="92" rx="12"/>
+        <text class="arch__t arch__t--head" x="140" y="82" text-anchor="middle">focusd.exe</text>
+        <text class="arch__t arch__t--sub"  x="140" y="106" text-anchor="middle">CLI + TUI</text>
+
+        <!-- Right process box -->
+        <rect class="arch__box" x="560" y="46" width="240" height="92" rx="12"/>
+        <text class="arch__t arch__t--head" x="680" y="82" text-anchor="middle">focusd_daemon.exe</text>
+        <text class="arch__t arch__t--sub"  x="680" y="106" text-anchor="middle">windowsgui, no UI</text>
+
+        <!-- Top arrow: → "stop" -->
+        <line class="arch__line" x1="266" y1="78" x2="554" y2="78" marker-end="url(#arch-arrow)"/>
+        <text class="arch__t arch__t--acc" x="410" y="70" text-anchor="middle">"stop"</text>
+
+        <!-- Bottom arrow: ← "flush" / "ok" -->
+        <line class="arch__line" x1="554" y1="106" x2="266" y2="106" marker-end="url(#arch-arrow)"/>
+        <text class="arch__t arch__t--acc" x="410" y="124" text-anchor="middle">"flush" / "ok"</text>
+
+        <!-- Vertical connectors to storage -->
+        <line class="arch__line arch__line--dash" x1="140" y1="138" x2="140" y2="212" marker-end="url(#arch-arrow)"/>
+        <line class="arch__line arch__line--dash" x1="680" y1="138" x2="680" y2="212" marker-end="url(#arch-arrow)"/>
+
+        <!-- Storage box -->
+        <rect class="arch__box" x="80" y="212" width="660" height="72" rx="12"/>
+        <text class="arch__t arch__t--sub"  x="410" y="238" text-anchor="middle">%APPDATA%\focusd\</text>
+        <text class="arch__t arch__t--head" x="410" y="262" text-anchor="middle">focusd.db · config.json · pomodoro.json</text>
+      </svg>
+      <p class="arch__note">
+        The CLI calls <code>flush</code> over local TCP before every report,
+        so <code>stats</code> is always caught up on the in-flight session.
+      </p>
+    </aside>
+  </div>
+</section>
+
+<section class="trust" aria-labelledby="trust-h">
+  <div data-reveal>
+    <span class="section__kicker">The quiet part, loud</span>
+    <h2 id="trust-h" class="display display--md">One network call. And you can turn it off.</h2>
+    <p>
+      The only outbound request focusd ever makes is an update check against
+      <code>api.github.com/repos/0xarchit/focusd/releases/latest</code>.
+      If you never call <code>focusd update</code>, focusd never opens a
+      socket. Everything else - tracking, limits, Pomodoro, export - stays
+      on your machine.
+    </p>
+  </div>
+  <ul class="trust__list" data-reveal aria-label="Guarantees">
+    <li><b>MIT licensed.</b> Read the source, ship it in a fork, resell it if you like.</li>
+    <li><b>No account.</b> There is no server to sign up for.</li>
+    <li><b>No analytics.</b> No page pings, no crash uploads, no "improve the product" checkbox.</li>
+    <li><b>You control updates.</b> The updater only runs when you invoke <code>focusd update</code>. Nothing checks silently in the background.</li>
+  </ul>
+</section>
+
+<section id="faq" class="faq" aria-labelledby="faq-h">
+  <header class="section__head" data-reveal>
+    <span class="section__kicker">FAQ</span>
+    <h2 id="faq-h" class="display display--md">Common questions.</h2>
+  </header>
+
+  <div class="faq__list" data-reveal>
+    <details>
+      <summary>Does focusd send my data anywhere?</summary>
+      <p>No. Sessions are written to <code>%APPDATA%\focusd\focusd.db</code>. The only outbound network call is an optional update check against the GitHub Releases API.</p>
+    </details>
+    <details>
+      <summary>How is this different from RescueTime, StayFree, or Toggl Track?</summary>
+      <p>focusd has no cloud sync, no account, and no telemetry - all three competitors listed require an account and sync your data to their servers. focusd writes tracking data only to a local SQLite database and never leaves the machine.</p>
+    </details>
+    <details>
+      <summary>Which browsers can it group tabs for?</summary>
+      <p>Chrome, Firefox, Edge, Brave, Opera, Vivaldi, Waterfox, Arc, Safari, Whale, Yandex, Thorium, LibreWolf, Chromium, Floorp, Zen, and any custom executable you register with <code>focusd browser add</code>.</p>
+    </details>
+    <details>
+      <summary>Does it run on macOS or Linux?</summary>
+      <p>Not yet. The tracker uses Win32 syscalls directly (<code>user32</code>, <code>kernel32</code>, <code>psapi</code>). The code compiles on other platforms via build stubs, but the daemon refuses to run.</p>
+    </details>
+    <details>
+      <summary>What happens to my data if I uninstall?</summary>
+      <p>The installer leaves <code>%APPDATA%\focusd\</code> in place so you can reinstall without losing history. Delete that directory manually if you want a clean slate.</p>
+    </details>
+    <details>
+      <summary>How does the auto-update work?</summary>
+      <p>Run <code>focusd update</code>. It queries <code>api.github.com/repos/0xarchit/focusd/releases/latest</code>, downloads <code>focusd_setup.exe</code> for that tag, stops the running daemon, and launches the NSIS installer with a UAC elevation prompt. The daemon restarts after the install completes. Nothing runs automatically - you invoke it when you want it.</p>
+    </details>
+  </div>
+</section>
+
+<section class="close" aria-labelledby="close-h" data-reveal>
+  <h2 id="close-h" class="display display--lg">
+    Track it.<br>
+    Own it.<br>
+    <em>That's the whole product.</em>
+  </h2>
+  <div class="close__actions">
+    <a class="btn btn--solid btn--lg" href="https://github.com/0xarchit/focusd/releases/latest" rel="noopener">Download focusd</a>
+    <a class="btn btn--ghost btn--lg" href="https://github.com/0xarchit/focusd" rel="noopener">Read the source</a>
+  </div>
+  <p class="close__foot"><code>focusd_setup.exe</code> · Windows 10 / 11 · x64 · MIT</p>
+</section>
+
+</main>
+
+<footer class="foot">
+  <div class="foot__row">
+    <a class="brand brand--sm" href="/" aria-label="focusd home">
+      <img class="brand__mark" src="assets/focusd-icon.svg" alt="" width="24" height="24" decoding="async">
+      <span class="brand__word">focusd</span>
+    </a>
+    <p class="foot__note">Built by <a href="https://github.com/0xarchit" rel="noopener">0xarchit</a>. Native Win32. MIT licensed.</p>
+  </div>
+  <nav class="foot__nav" aria-label="Footer">
+    <a href="https://github.com/0xarchit/focusd" rel="noopener">GitHub</a>
+    <a href="https://github.com/0xarchit/focusd/releases" rel="noopener">Releases</a>
+    <a href="https://github.com/0xarchit/focusd/blob/main/LICENSE" rel="noopener">License</a>
+    <a href="https://github.com/0xarchit/focusd/issues" rel="noopener">Report an issue</a>
+  </nav>
+</footer>
+
+<!-- Floating star-the-repo widget. Hidden until the API returns a count so the
+     first paint doesn't show a placeholder. -->
+<a class="starw" href="https://github.com/0xarchit/focusd" rel="noopener"
+   aria-label="Star focusd on GitHub" data-js="starw" hidden>
+  <span class="starw__spark" aria-hidden="true"></span>
+  <svg class="starw__icon" viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
+    <path fill="currentColor" d="M12 2.5l2.9 6.9 7.6.6-5.8 4.9 1.8 7.3L12 18.4 5.5 22.2l1.8-7.3-5.8-4.9 7.6-.6L12 2.5z"/>
+  </svg>
+  <span class="starw__label">Star on GitHub</span>
+  <span class="starw__count" data-js="stars">-</span>
+</a>
+
+<script src="script.js" defer></script>
+</body>
+</html>

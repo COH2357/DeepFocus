@@ -1,0 +1,49 @@
+package cli
+
+import (
+	"fmt"
+	"focusd/storage"
+	"focusd/ui"
+	"os"
+)
+
+func runPause() {
+	if err := storage.Init(); err != nil {
+		ui.PrintError(fmt.Sprintf("Failed to initialize: %v", err))
+		os.Exit(1)
+	}
+	defer storage.Close()
+
+	if storage.IsPaused() {
+		ui.PrintInfo("Tracking is already paused.")
+		return
+	}
+
+	if err := storage.SetPaused(true); err != nil {
+		ui.PrintError(fmt.Sprintf("Failed to pause tracking: %v", err))
+		return
+	}
+
+	ui.PrintOK("Tracking paused.")
+	fmt.Println("Run 'deepfocus resume' to resume tracking.")
+}
+
+func runResume() {
+	if err := storage.Init(); err != nil {
+		ui.PrintError(fmt.Sprintf("Failed to initialize: %v", err))
+		os.Exit(1)
+	}
+	defer storage.Close()
+
+	if !storage.IsPaused() {
+		ui.PrintInfo("Tracking is already active.")
+		return
+	}
+
+	if err := storage.SetPaused(false); err != nil {
+		ui.PrintError(fmt.Sprintf("Failed to resume tracking: %v", err))
+		return
+	}
+
+	ui.PrintOK("Tracking resumed.")
+}

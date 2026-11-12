@@ -1,0 +1,674 @@
+package tui
+
+import (
+	"fmt"
+	"sort"
+	"strconv"
+	"strings"
+	"time"
+
+	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
+)
+
+func (m *Model) statsVisibleRows(isBrowser bool) int {
+	inner := m.width - 2
+	contentHeight := m.contentHeight()
+	if inner >= 120 {
+		return max(3, min(10, contentHeight-15))
+	}
+	if contentHeight < 30 {
+		hide := m.panelFocus != 2
+		if !isBrowser {
+			hide = m.panelFocus == 2 || m.panelFocus == 3
+		}
+		if hide {
+			return 0
+		}
+		return max(4, contentHeight-12)
+	}
+	return max(3, min(6, (contentHeight-15)/2))
+}
+
+func (m Model) loadStatsCmd() tea.Cmd {
+	return loadStats(m.statsRange, m.statsCustomFrom, m.statsCustomTo)
+}
+
+func (m Model) handleCustomRangeModalKey(msg tea.KeyMsg) (Model, tea.Cmd) {
+	key := msg.String()
+	m.modal.Error = ""
+	switch key {
+	case "esc":
+		m.modal = modal{}
+	case "tab", "shift+tab", "left", "right", "h", "l":
+		m.statsCustomField = (m.statsCustomField + 1) % 2
+	case "backspace":
+		draft := &m.statsCustomDraftFrom
+		if m.statsCustomField == 1 {
+			draft = &m.statsCustomDraftTo
+		}
+		if n := len(*draft); n > 0 {
+			if n == 6 || n == 9 {
+				*draft = (*draft)[:n-2]
+			} else {
+				*draft = (*draft)[:n-1]
+			}
+		}
+	case "enter":
+		from, to, err := validateCustomRange(m.statsCustomDraftFrom, m.statsCustomDraftTo, time.Now())
+		if err != nil {
+			m.modal.Error = err.Error()
+			return m, nil
+		}
+		m.statsCustomFrom = from
+		m.statsCustomTo = to
+		m.modal = modal{}
+		m.refreshing = true
+		return m, m.loadStatsCmd()
+	default:
+		for _, r := range msg.Runes {
+			if r < '0' || r > '9' {
+				continue
+			}
+			draft := &m.statsCustomDraftFrom
+			if m.statsCustomField == 1 {
+				draft = &m.statsCustomDraftTo
+			}
+			n := len(*draft)
+			if n >= 10 {
+				continue
+			}
+			if n == 4 || n == 7 {
+				*draft += "-"
+			}
+			*draft += string(r)
+		}
+	}
+	return m, nil
+}
+
+func (m Model) handleStatsKey(key string) (Model, tea.Cmd) {
+	switch key {
+	case "h", "left":
+		m.statsRange = (m.statsRange + 3) % 4
+		m.refreshing = true
+		return m, m.loadStatsCmd()
+	case "l", "right":
+		m.statsRange = (m.statsRange + 1) % 4
+		m.refreshing = true
+		return m, m.loadStatsCmd()
+	case "enter":
+		if m.panelFocus == 0 && m.statsRange == 3 {
+			m.statsCustomDraftFrom = m.statsCustomFrom
+			m.statsCustomDraftTo = m.statsCustomTo
+			m.statsCustomField = 0
+			m.modal = modal{
+				Active:  true,
+				Title:   "CUSTOM RANGE",
+				Message: "Enter a date range for Stats.",
+			}
+			return m, nil
+		}
+	case "s":
+		if m.panelFocus == 1 {
+			m.statsSort = (m.statsSort + 1) % 3
+			if m.statsSort == 0 || m.statsSort == 2 {
+				m.statsAsc = false
+			} else {
+				m.statsAsc = !m.statsAsc
+			}
+		}
+	case "j", "down":
+		switch m.panelFocus {
+		case 1:
+			appsLen := len(m.sortedStatsApps())
+			if appsLen > 0 {
+				m.statsSelected = min(m.statsSelected+1, appsLen-1)
+				visibleRows := m.statsVisibleRows(false)
+				if m.statsSelected >= m.statsUsageOffset+visibleRows {
+					m.statsUsageOffset = clampScrollOffset(m.statsSelected-visibleRows+1, visibleRows, appsLen)
+				}
+			}
+		case 2:
+			browserLen := len(m.stats.Browsers)
+			if browserLen > 0 {
+				m.browserSelected = min(m.browserSelected+1, browserLen-1)
+				visibleRows := m.statsVisibleRows(true)
+				if m.browserSelected >= m.statsBrowserOffset+visibleRows {
+					m.statsBrowserOffset = clampScrollOffset(m.browserSelected-visibleRows+1, visibleRows, browserLen)
+				}
+			}
+		}
+	case "k", "up":
+		switch m.panelFocus {
+		case 1:
+			appsLen := len(m.sortedStatsApps())
+			if appsLen > 0 {
+				m.statsSelected = max(0, m.statsSelected-1)
+				if m.statsSelected < m.statsUsageOffset {
+					m.statsUsageOffset = m.statsSelected
+				}
+			}
+		case 2:
+			browserLen := len(m.stats.Browsers)
+			if browserLen > 0 {
+				m.browserSelected = max(0, m.browserSelected-1)
+				if m.browserSelected < m.statsBrowserOffset {
+					m.statsBrowserOffset = m.browserSelected
+				}
+			}
+		}
+	case "pgdown":
+		switch m.panelFocus {
+		case 1:
+			appsLen := len(m.sortedStatsApps())
+			if appsLen > 0 {
+				visibleRows := m.statsVisibleRows(false)
+				m.statsSelected = min(m.statsSelected+visibleRows, appsLen-1)
+				if m.statsSelected >= m.statsUsageOffset+visibleRows {
+					m.statsUsageOffset = clampScrollOffset(m.statsSelected-visibleRows+1, visibleRows, appsLen)
+				}
+			}
+		case 2:
+			browserLen := len(m.stats.Browsers)
+			if browserLen > 0 {
+				visibleRows := m.statsVisibleRows(true)
+				m.browserSelected = min(m.browserSelected+visibleRows, browserLen-1)
+				if m.browserSelected >= m.statsBrowserOffset+visibleRows {
+					m.statsBrowserOffset = clampScrollOffset(m.browserSelected-visibleRows+1, visibleRows, browserLen)
+				}
+			}
+		}
+	case "pgup":
+		switch m.panelFocus {
+		case 1:
+			appsLen := len(m.sortedStatsApps())
+			if appsLen > 0 {
+				visibleRows := m.statsVisibleRows(false)
+				m.statsSelected = max(0, m.statsSelected-visibleRows)
+				if m.statsSelected < m.statsUsageOffset {
+					m.statsUsageOffset = max(0, m.statsSelected)
+				}
+			}
+		case 2:
+			browserLen := len(m.stats.Browsers)
+			if browserLen > 0 {
+				visibleRows := m.statsVisibleRows(true)
+				m.browserSelected = max(0, m.browserSelected-visibleRows)
+				if m.browserSelected < m.statsBrowserOffset {
+					m.statsBrowserOffset = max(0, m.browserSelected)
+				}
+			}
+		}
+	}
+	return m, nil
+}
+
+func validateCustomRange(from, to string, now time.Time) (string, string, error) {
+	fromTime, err := time.Parse("2006-01-02", from)
+	if err != nil {
+		return "", "", fmt.Errorf("Invalid date format. Use YYYY-MM-DD")
+	}
+	toTime, err := time.Parse("2006-01-02", to)
+	if err != nil {
+		return "", "", fmt.Errorf("Invalid date format. Use YYYY-MM-DD")
+	}
+	if fromTime.After(toTime) {
+		return "", "", fmt.Errorf("From date must be before To date")
+	}
+	// The dates parse as UTC midnight, so comparing them against the local
+	// wall clock rejects "today" for every timezone east of UTC until its
+	// offset has elapsed. The local calendar date is the right reference.
+	if to > now.Format("2006-01-02") {
+		return "", "", fmt.Errorf("To date cannot be in the future")
+	}
+	if int(toTime.Sub(fromTime).Hours()/24)+1 > 366 {
+		return "", "", fmt.Errorf("Range must be 366 days or less")
+	}
+	return from, to, nil
+}
+
+func (m *Model) renderStats(width, height int) string {
+	inner := width - 2
+	rangeSelector := m.renderRangeSelector(inner - 4)
+	topPanel := panelWithHover("TIME RANGE", "", inner, "\n"+rangeSelector+"\n", m.panelFocus == 0, m.hoveredPanel == 0)
+
+	topH := lipgloss.Height(topPanel)
+	topY := m.contentTop + topH
+
+	m.clickableRegions = append(m.clickableRegions, clickableRegion{
+		X1: 0, Y1: m.contentTop, X2: lipgloss.Width(topPanel), Y2: m.clampBodyBottom(topY, height),
+		ID: "panel-0", Kind: "panel",
+	})
+
+	var middleRow string
+	if inner >= 120 {
+		leftW := (inner - 2) / 2
+		rightW := inner - 2 - leftW
+
+		usageRows := m.statsVisibleRows(false)
+		browserRows := m.statsVisibleRows(true)
+		appsPanel := panelWithHover("APPLICATION BREAKDOWN", "", leftW, "\n"+m.renderUsageBreakdown(leftW, usageRows)+"\n", m.panelFocus == 1, m.hoveredPanel == 1)
+		browsersPanel := panelWithHover("BROWSER USAGE", "", rightW, "\n"+m.renderBrowserUsage(rightW, browserRows)+"\n", m.panelFocus == 2, m.hoveredPanel == 2)
+		middleRow = lipgloss.JoinHorizontal(lipgloss.Top, appsPanel, " ", browsersPanel)
+
+		appsW := lipgloss.Width(appsPanel)
+		m.clickableRegions = append(m.clickableRegions,
+			clickableRegion{
+				X1: 0, Y1: topY, X2: appsW, Y2: m.clampBodyBottom(topY+lipgloss.Height(appsPanel), height),
+				ID: "panel-1", Kind: "panel",
+			},
+			clickableRegion{
+				X1: appsW + 1, Y1: topY, X2: appsW + 1 + lipgloss.Width(browsersPanel), Y2: m.clampBodyBottom(topY+lipgloss.Height(browsersPanel), height),
+				ID: "panel-2", Kind: "panel",
+			})
+	} else {
+		if m.panelFocus == 0 || m.panelFocus == 1 {
+			usageRows := m.statsVisibleRows(false)
+			middleRow = panelWithHover("APPLICATION BREAKDOWN", "", inner, "\n"+m.renderUsageBreakdown(inner, usageRows)+"\n", m.panelFocus == 1, m.hoveredPanel == 1)
+			m.clickableRegions = append(m.clickableRegions, clickableRegion{
+				X1: 0, Y1: topY, X2: lipgloss.Width(middleRow), Y2: m.clampBodyBottom(topY+lipgloss.Height(middleRow), height),
+				ID: "panel-1", Kind: "panel",
+			})
+		} else {
+			browserRows := m.statsVisibleRows(true)
+			middleRow = panelWithHover("BROWSER USAGE", "", inner, "\n"+m.renderBrowserUsage(inner, browserRows)+"\n", m.panelFocus == 2, m.hoveredPanel == 2)
+			m.clickableRegions = append(m.clickableRegions, clickableRegion{
+				X1: 0, Y1: topY, X2: lipgloss.Width(middleRow), Y2: m.clampBodyBottom(topY+lipgloss.Height(middleRow), height),
+				ID: "panel-2", Kind: "panel",
+			})
+		}
+	}
+
+	historyPanel := m.renderDailyHistory(inner)
+	historyY := topY + lipgloss.Height(middleRow)
+	m.clickableRegions = append(m.clickableRegions, clickableRegion{
+		X1: 0, Y1: historyY, X2: lipgloss.Width(historyPanel), Y2: m.clampBodyBottom(historyY+lipgloss.Height(historyPanel), height),
+		ID: "panel-3", Kind: "panel",
+	})
+
+	return lipgloss.JoinVertical(lipgloss.Left, topPanel, middleRow, historyPanel)
+}
+
+func (m *Model) renderRangeSelector(width int) string {
+	ranges := []string{"TODAY", "LAST 7 DAYS", "LAST 30 DAYS", "CUSTOM RANGE"}
+	var parts []string
+	var labelWidths []int
+
+	for i, r := range ranges {
+		label := "[ " + r + " ]"
+		labelWidths = append(labelWidths, lipgloss.Width(label))
+		if i == m.statsRange {
+			parts = append(parts, cyanStyle.Bold(true).Render(label))
+		} else {
+			parts = append(parts, mutedStyle.Render(label))
+		}
+	}
+	selector := strings.Join(parts, "   ")
+	if m.statsRange == 3 {
+		selector += mutedStyle.Render(fmt.Sprintf("   Range: %s to %s", m.statsCustomFrom, m.statsCustomTo))
+	}
+
+	// The renderer centers the selector line inside the panel body, so the
+	// buttons are registered from that same padding and the actual label
+	// widths instead of an offset table that drifts from the render.
+	pad := max(0, (width-lipgloss.Width(selector))/2)
+	startX := 1 + pad // the panel's left border owns column 0
+	for i := range ranges {
+		m.clickableRegions = append(m.clickableRegions, clickableRegion{
+			X1: startX, Y1: m.contentTop + 2, X2: startX + labelWidths[i], Y2: m.contentTop + 3,
+			ID: fmt.Sprintf("range-%d", i), Kind: "button",
+		})
+		startX += labelWidths[i] + 3
+	}
+
+	var kpiParts []string
+	topApps := m.sortedStatsApps()
+	topAppName := "None"
+	if len(topApps) > 0 {
+		topAppName = fmt.Sprintf("%s (%s)", topApps[0].Name, formatDuration(topApps[0].Duration))
+	}
+
+	switch m.statsRange {
+	case 0:
+		kpiParts = append(kpiParts, fmt.Sprintf("Today Screen Time: %s", cyanStyle.Render(formatDuration(m.stats.Total))))
+		kpiParts = append(kpiParts, fmt.Sprintf("Active Apps: %s", cyanStyle.Render(fmt.Sprintf("%d", m.stats.ActiveApps))))
+		kpiParts = append(kpiParts, fmt.Sprintf("App Launches: %s", cyanStyle.Render(fmt.Sprintf("%d", m.stats.TotalAppLaunches))))
+		kpiParts = append(kpiParts, fmt.Sprintf("Top App: %s", cyanStyle.Render(topAppName)))
+
+	case 1:
+		kpiParts = append(kpiParts, fmt.Sprintf("7-Day Screen Time: %s", cyanStyle.Render(formatDuration(m.stats.Total))))
+		kpiParts = append(kpiParts, fmt.Sprintf("Daily Avg: %s", cyanStyle.Render(formatDuration(m.stats.DailyAvg))))
+		if m.stats.PeakDayDuration > 0 {
+			kpiParts = append(kpiParts, fmt.Sprintf("Peak Day: %s (%s)", cyanStyle.Render(m.stats.PeakDayLabel), cyanStyle.Render(formatDuration(m.stats.PeakDayDuration))))
+		}
+		kpiParts = append(kpiParts, fmt.Sprintf("App Launches: %s", cyanStyle.Render(fmt.Sprintf("%d", m.stats.TotalAppLaunches))))
+
+	case 2:
+		kpiParts = append(kpiParts, fmt.Sprintf("30-Day Total: %s", cyanStyle.Render(formatDuration(m.stats.Total))))
+		kpiParts = append(kpiParts, fmt.Sprintf("Daily Avg: %s", cyanStyle.Render(formatDuration(m.stats.DailyAvg))))
+		kpiParts = append(kpiParts, fmt.Sprintf("Last 7-Day Total: %s", cyanStyle.Render(formatDuration(m.stats.Last7DaysTotal))))
+		if m.stats.PeakDayDuration > 0 {
+			kpiParts = append(kpiParts, fmt.Sprintf("Peak Day: %s (%s)", cyanStyle.Render(m.stats.PeakDayLabel), cyanStyle.Render(formatDuration(m.stats.PeakDayDuration))))
+		}
+
+	case 3:
+		numDays := len(m.stats.Days)
+		kpiParts = append(kpiParts, fmt.Sprintf("Range Total (%dd): %s", numDays, cyanStyle.Render(formatDuration(m.stats.Total))))
+		kpiParts = append(kpiParts, fmt.Sprintf("Daily Avg: %s", cyanStyle.Render(formatDuration(m.stats.DailyAvg))))
+		if m.stats.PeakDayDuration > 0 {
+			kpiParts = append(kpiParts, fmt.Sprintf("Peak Day: %s (%s)", cyanStyle.Render(m.stats.PeakDayLabel), cyanStyle.Render(formatDuration(m.stats.PeakDayDuration))))
+		}
+		kpiParts = append(kpiParts, fmt.Sprintf("App Launches: %s", cyanStyle.Render(fmt.Sprintf("%d", m.stats.TotalAppLaunches))))
+	}
+
+	div := mutedStyle.Render(strings.Repeat("─", min(width, 70)))
+
+	kpiBlock := center(selector, width) + "\n" +
+		center(div, width) + "\n" +
+		center(strings.Join(kpiParts, mutedStyle.Render("  │  ")), width)
+
+	return kpiBlock
+}
+
+func (m *Model) renderUsageBreakdown(width, visibleRows int) string {
+	var lines []string
+	sorted := m.sortedStatsApps()
+	maxDuration := 1
+	for _, a := range sorted {
+		if a.Duration > maxDuration {
+			maxDuration = a.Duration
+		}
+	}
+
+	headerPlain := padRight("Application", max(8, width-32)) + padLeft("Time", 8) + padLeft("Opens", 8)
+	header := boldStyle.Render(fitLine(headerPlain, width-4))
+	lines = append(lines, header, mutedStyle.Render(strings.Repeat("─", max(0, width-4))))
+
+	if len(sorted) > 0 {
+		start := m.statsUsageOffset
+		end := min(len(sorted), start+visibleRows)
+		for i := start; i < end; i++ {
+			a := sorted[i]
+			color := cyanStyle
+			if i == m.statsSelected && m.panelFocus == 1 {
+				color = lipgloss.NewStyle().Foreground(cWhite)
+			}
+			filled := 0
+			if maxDuration > 0 {
+				filled = a.Duration * 3 / maxDuration
+				if filled == 0 && a.Duration > 0 {
+					filled = 1
+				}
+				if filled > 3 {
+					filled = 3
+				}
+			}
+			barStr := strings.Repeat("█", filled) + strings.Repeat("░", 3-filled)
+			line := mutedStyle.Render(fmt.Sprintf("%2d. ", i+1)) +
+				color.Render(padRight(truncate(a.Name, max(8, width-36)), max(8, width-36))) +
+				padLeft(formatDuration(a.Duration), 8) +
+				padLeft(strconv.Itoa(a.Opens), 8) + " " +
+				color.Render(barStr)
+
+			if i == m.statsSelected && m.panelFocus == 1 {
+				line = selectedRowStyle.Render(padRight(line, width-4))
+			} else if m.hoveredPanel == 1 && m.statsSelected == i {
+				line = hoverRowStyle.Render(padRight(line, width-4))
+			}
+			lines = append(lines, line)
+		}
+	} else {
+		lines = append(lines, mutedStyle.Render("No usage recorded for this range."))
+	}
+	return strings.Join(lines, "\n")
+}
+
+func (m *Model) renderBrowserUsage(width, visibleRows int) string {
+	var lines []string
+	titleW := max(8, width-16)
+	// Rows start with the "▶ " marker, so the header is indented by the same
+	// two cells to keep "Time" above the right-aligned durations.
+	lines = append(lines, boldStyle.Render(fitLine("  "+padRight("Tab Title", titleW)+padLeft("Time", 10), width-4)), mutedStyle.Render(strings.Repeat("─", max(0, width-4))))
+
+	if len(m.stats.Browsers) > 0 {
+		start := m.statsBrowserOffset
+		end := min(len(m.stats.Browsers), start+visibleRows)
+		for i := start; i < end; i++ {
+			b := m.stats.Browsers[i]
+			prefix := mutedStyle.Render("▶ ")
+			line := prefix + boldStyle.Render(padRight(truncate(b.Name, titleW), titleW)) + padLeft(formatDuration(b.Duration), 10)
+			if i == m.browserSelected && m.panelFocus == 2 {
+				line = selectedRowStyle.Render(padRight(line, width-4))
+			} else if m.hoveredPanel == 2 && m.browserSelected == i {
+				line = hoverRowStyle.Render(padRight(line, width-4))
+			}
+			lines = append(lines, line)
+		}
+	} else {
+		lines = append(lines, mutedStyle.Render("No browser activity recorded."))
+	}
+	return strings.Join(lines, "\n")
+}
+
+type historyBucket struct {
+	Label    string
+	Duration int
+	IsToday  bool
+	IsEnd    bool
+}
+
+func (m *Model) renderDailyHistory(width int) string {
+	if len(m.stats.Days) == 0 {
+		return panelWithHover("HISTORY", "", width, "\n  "+mutedStyle.Render("No history data recorded for selected range.")+"\n", m.panelFocus == 3, m.hoveredPanel == 3)
+	}
+
+	availW := max(10, width-6)
+	numDays := len(m.stats.Days)
+	colW := availW / numDays
+
+	var buckets []historyBucket
+
+	if colW >= 5 {
+		colW = min(colW, 8)
+		for _, d := range m.stats.Days {
+			lbl := d.Label
+			if numDays > 7 {
+				if t, err := time.Parse("2006-01-02", d.Date); err == nil {
+					lbl = t.Format("01/02")
+				}
+			}
+			buckets = append(buckets, historyBucket{
+				Label:    lbl,
+				Duration: d.Duration,
+				IsToday:  d.Today,
+			})
+		}
+	} else {
+		chunkSize := 7
+		if numDays > 120 {
+			chunkSize = 30
+		}
+		for i := 0; i < numDays; i += chunkSize {
+			endIdx := i + chunkSize
+			if endIdx > numDays {
+				endIdx = numDays
+			}
+			chunk := m.stats.Days[i:endIdx]
+
+			startT, errStart := time.Parse("2006-01-02", chunk[0].Date)
+			endT, errEnd := time.Parse("2006-01-02", chunk[len(chunk)-1].Date)
+
+			lbl := chunk[0].Date
+			if errStart == nil && errEnd == nil {
+				if chunkSize == 7 {
+					lbl = fmt.Sprintf("%s-%s", startT.Format("01/02"), endT.Format("01/02"))
+				} else {
+					lbl = startT.Format("Jan 06")
+				}
+			}
+
+			totDur := 0
+			hasToday := false
+			for _, d := range chunk {
+				totDur += d.Duration
+				if d.Today {
+					hasToday = true
+				}
+			}
+
+			buckets = append(buckets, historyBucket{
+				Label:    lbl,
+				Duration: totDur,
+				IsToday:  hasToday,
+			})
+		}
+		colW = availW / len(buckets)
+		colW = max(10, min(colW, 16))
+	}
+
+	maxDuration := 1
+	for _, b := range buckets {
+		if b.Duration > maxDuration {
+			maxDuration = b.Duration
+		}
+	}
+
+	var lines []string
+	var bars []string
+	var labels []string
+	var hours []string
+
+	maxH := 4
+	for h := maxH; h >= 1; h-- {
+		var row []string
+		for _, b := range buckets {
+			pct := b.Duration * 100 / maxDuration
+			threshold := h * 100 / maxH
+			ch := "░"
+			if pct >= threshold {
+				ch = "█"
+				if b.IsToday {
+					ch = cyanStyle.Render(ch)
+				} else {
+					ch = cyanStyle.Render(ch)
+				}
+			} else {
+				ch = mutedStyle.Render("·")
+			}
+			row = append(row, center(ch, colW))
+		}
+		bars = append(bars, "  "+strings.Join(row, "")+"  ")
+	}
+
+	for _, b := range buckets {
+		style := lipgloss.NewStyle().Foreground(cWhite)
+		if b.IsToday {
+			style = cyanStyle
+		}
+		labels = append(labels, center(style.Render(b.Label), colW))
+
+		hrStr := fmt.Sprintf("%2.1fh", float64(b.Duration)/3600.0)
+		hours = append(hours, center(mutedStyle.Render(hrStr), colW))
+	}
+
+	lines = append(lines, bars...)
+	lines = append(lines, "  "+strings.Join(labels, "")+"  ")
+	lines = append(lines, "  "+strings.Join(hours, "")+"  ")
+
+	title := "DAILY HISTORY"
+	if m.statsRange == 1 {
+		title = "DAILY HISTORY (LAST 7 DAYS)"
+	} else if m.statsRange == 2 {
+		if colW >= 10 {
+			title = "WEEKLY HISTORY (LAST 30 DAYS)"
+		} else {
+			title = "DAILY HISTORY (LAST 30 DAYS)"
+		}
+	} else if m.statsRange == 3 {
+		if colW >= 10 {
+			title = fmt.Sprintf("PERIODIC HISTORY (%d DAYS)", numDays)
+		} else {
+			title = fmt.Sprintf("DAILY HISTORY (%d DAYS)", numDays)
+		}
+	}
+	return panelWithHover(title, "", width, "\n"+strings.Join(lines, "\n")+"\n", m.panelFocus == 3, m.hoveredPanel == 3)
+}
+
+func (m *Model) renderCustomRangeModal() string {
+	from := padRight(m.statsCustomDraftFrom, 10)
+	to := padRight(m.statsCustomDraftTo, 10)
+	if m.statsCustomField == 0 {
+		from = cyanStyle.Bold(true).Render(from)
+	} else {
+		to = cyanStyle.Bold(true).Render(to)
+	}
+	errorLine := mutedStyle.Render("Digits are auto-formatted as YYYY-MM-DD")
+	if m.modal.Error != "" {
+		errorLine = redStyle.Render(m.modal.Error)
+	}
+	msg := []string{
+		"",
+		mutedStyle.Render(m.modal.Message),
+		"",
+		"From: [ " + from + " ]",
+		"To:   [ " + to + " ]",
+		"",
+		errorLine,
+		"",
+		center(cyanStyle.Render("[ ENTER APPLY ]")+"   "+buttonStyle.Render("[ ESC CANCEL ]"), 42),
+		"",
+		mutedStyle.Render("Tab / ← → switch fields   Backspace deletes"),
+	}
+	return panelWithHover("CUSTOM RANGE", "", 50, strings.Join(msg, "\n"), true, false)
+}
+
+func (m *Model) sortedStatsApps() []appUsage {
+	var firstItems string
+	if len(m.stats.Apps) > 0 {
+		firstItems = m.stats.Apps[0].Name + fmt.Sprintf("-%d-%d", m.stats.Apps[0].Duration, m.stats.Apps[0].Opens)
+	}
+	if len(m.stats.Apps) > 1 {
+		firstItems += m.stats.Apps[1].Name + fmt.Sprintf("-%d-%d", m.stats.Apps[1].Duration, m.stats.Apps[1].Opens)
+	}
+	key := fmt.Sprintf("%d-%d-%t-%d-%s", len(m.stats.Apps), m.statsSort, m.statsAsc, m.stats.Total, firstItems)
+	if m.sortedAppsCache != nil && m.sortedAppsCacheKey == key {
+		return m.sortedAppsCache
+	}
+	apps := append([]appUsage(nil), m.stats.Apps...)
+	sort.Slice(apps, func(i, j int) bool {
+		cmp := 0
+		switch m.statsSort {
+		case 0:
+			if apps[i].Duration != apps[j].Duration {
+				cmp = 1
+				if apps[i].Duration < apps[j].Duration {
+					cmp = -1
+				}
+			}
+		case 1:
+			cmp = strings.Compare(apps[i].Name, apps[j].Name)
+		case 2:
+			if apps[i].Opens != apps[j].Opens {
+				cmp = 1
+				if apps[i].Opens < apps[j].Opens {
+					cmp = -1
+				}
+			}
+		default:
+			return false
+		}
+		if cmp == 0 {
+			// Equal rows fall back to the name so the list cannot reshuffle
+			// between refreshes.
+			return apps[i].Name < apps[j].Name
+		}
+		if m.statsAsc {
+			return cmp < 0
+		}
+		return cmp > 0
+	})
+	m.sortedAppsCache = apps
+	m.sortedAppsCacheKey = key
+	return apps
+}

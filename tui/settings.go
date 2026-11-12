@@ -1,0 +1,432 @@
+package tui
+
+import (
+	"encoding/csv"
+	"encoding/json"
+	"fmt"
+	"focusd/storage"
+	"focusd/system"
+	"os"
+	"os/exec"
+	"path/filepath"
+	"strconv"
+	"strings"
+
+	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
+)
+
+func (m *Model) handleSettingsKey(key string) (Model, tea.Cmd) {
+	if m.settingsAddingWhitelist {
+		switch key {
+		case "esc":
+			m.settingsAddingWhitelist = false
+			m.settingsWhitelistInput = ""
+		case "backspace":
+			if len(m.settingsWhitelistInput) > 0 {
+				m.settingsWhitelistInput = m.settingsWhitelistInput[:len(m.settingsWhitelistInput)-1]
+			}
+		case "enter":
+			if strings.TrimSpace(m.settingsWhitelistInput) == "" {
+				m.addToast("App name is required", toastError)
+				return *m, nil
+			}
+			if err := system.AddWhitelistApp(m.settingsWhitelistInput); err != nil {
+				m.addToast(err.Error(), toastError)
+				return *m, nil
+			}
+			m.addToast("Whitelisted "+m.settingsWhitelistInput, toastSuccess)
+			m.settingsAddingWhitelist = false
+			m.settingsWhitelistInput = ""
+		default:
+			if len(key) == 1 && len(m.settingsWhitelistInput) < 32 {
+				m.settingsWhitelistInput += key
+			} else if key == "space" || key == " " {
+				if len(m.settingsWhitelistInput) < 32 {
+					m.settingsWhitelistInput += " "
+				}
+			}
+		}
+		return *m, nil
+	}
+
+	if m.settingsAddingBrowser {
+		switch key {
+		case "esc":
+			m.settingsAddingBrowser = false
+			m.settingsBrowserInput = ""
+		case "backspace":
+			if len(m.settingsBrowserInput) > 0 {
+				m.settingsBrowserInput = m.settingsBrowserInput[:len(m.settingsBrowserInput)-1]
+			}
+		case "enter":
+			if strings.TrimSpace(m.settingsBrowserInput) == "" {
+				m.addToast("Browser name is required", toastError)
+				return *m, nil
+			}
+			if err := system.AddCustomBrowser(m.settingsBrowserInput); err != nil {
+				m.addToast(err.Error(), toastError)
+			} else {
+				m.addToast("Added "+m.settingsBrowserInput, toastSuccess)
+			}
+			m.settingsAddingBrowser = false
+			m.settingsBrowserInput = ""
+		default:
+			if len(key) == 1 && len(m.settingsBrowserInput) < 32 {
+				m.settingsBrowserInput += key
+			} else if key == "space" || key == " " {
+				if len(m.settingsBrowserInput) < 32 {
+					m.settingsBrowserInput += " "
+				}
+			}
+		}
+		return *m, nil
+	}
+
+	switch key {
+	case "j", "down":
+		m.settingsSelected = min(m.settingsSelected+1, 9)
+	case "k", "up":
+		m.settingsSelected = max(0, m.settingsSelected-1)
+	case "h", "left":
+		switch m.settingsSelected {
+		case 4:
+			m.settingsBrowserSelected = max(0, m.settingsBrowserSelected-1)
+		case 3:
+			m.settingsWhitelistSelected = max(0, m.settingsWhitelistSelected-1)
+		case 5:
+			days := max(storage.MinRetentionDays, storage.GetRetentionDays()-1)
+			if err := storage.SetRetentionDays(days); err == nil {
+				m.addToast(fmt.Sprintf("Retention set to %d days", days), toastInfo)
+			}
+		case 7:
+			m.settingsExportSelected = 0
+		}
+	case "l", "right":
+		switch m.settingsSelected {
+		case 4:
+			browsers := system.GetCustomBrowsersList()
+			m.settingsBrowserSelected = min(m.settingsBrowserSelected+1, max(0, len(browsers)-1))
+		case 3:
+			whitelist := system.GetWhitelistApps()
+			m.settingsWhitelistSelected = min(m.settingsWhitelistSelected+1, max(0, len(whitelist)-1))
+		case 5:
+			days := min(storage.MaxRetentionDays, storage.GetRetentionDays()+1)
+			if err := storage.SetRetentionDays(days); err == nil {
+				m.addToast(fmt.Sprintf("Retention set to %d days", days), toastInfo)
+			}
+		case 7:
+			m.settingsExportSelected = 1
+		}
+	case "space", "enter":
+		switch m.settingsSelected {
+		case 0:
+			if m.daemonActive {
+				return *m, stopDaemonCmd()
+			}
+			pid, err := system.StartDaemon()
+			if err != nil {
+				m.addToast("Failed to start daemon: "+err.Error(), toastError)
+			} else {
+				m.addToast(fmt.Sprintf("Daemon started (PID %d)", pid), toastSuccess)
+				m.daemonActive = true
+			}
+		case 1:
+			enabled, _, err := system.GetAutoStartEnabled()
+			if err != nil {
+				m.addToast(fmt.Sprintf("Failed to query auto-start: %v", err), toastError)
+			} else if enabled {
+				if err := system.DisableAutoStart(); err != nil {
+					m.addToast("Failed to disable auto-start", toastError)
+				} else {
+					m.addToast("Auto-start disabled", toastSuccess)
+				}
+			} else {
+				if err := system.EnableAutoStart(); err != nil {
+					m.addToast("Failed to enable auto-start", toastError)
+				} else {
+					m.addToast("Auto-start enabled", toastSuccess)
+				}
+			}
+		case 2:
+			paused := storage.IsPaused()
+			if err := storage.SetPaused(!paused); err != nil {
+				m.addToast("Failed to toggle tracking", toastError)
+			} else {
+				m.addToast("Tracking toggled", toastSuccess)
+			}
+		case 3:
+			m.settingsAddingWhitelist = true
+			m.settingsWhitelistInput = ""
+		case 4:
+			m.settingsAddingBrowser = true
+			m.settingsBrowserInput = ""
+		case 5:
+			current := storage.GetRetentionDays()
+			next := 30
+			if current < 30 {
+				next = 30
+			} else if current < 90 {
+				next = 90
+			} else if current < 180 {
+				next = 180
+			} else if current < 365 {
+				next = 365
+			} else {
+				next = 30
+			}
+			if err := storage.SetRetentionDays(next); err == nil {
+				m.addToast(fmt.Sprintf("Retention set to %d days", next), toastInfo)
+			}
+		case 6:
+			openDBFolder()
+		case 7:
+			jsonOut := m.settingsExportSelected == 1
+			path, err := exportData(jsonOut)
+			if err != nil {
+				m.addToast("Export failed: "+err.Error(), toastError)
+			} else {
+				m.addToast("Exported to Downloads\\"+filepath.Base(path), toastSuccess)
+			}
+		case 8:
+			if err := launchGitHubUpdate(); err != nil {
+				m.addToast("Failed to launch updater", toastError)
+			} else {
+				m.addToast("Updater opened in new window", toastSuccess)
+			}
+		case 9:
+			m.modal = modal{
+				Active: true, Title: "WIPE DATA", Required: "DELETE",
+				Message: "This will delete all tracking data and cannot be undone.",
+			}
+		}
+	case "d":
+		if m.settingsSelected == 3 {
+			whitelist := system.GetWhitelistApps()
+			if len(whitelist) > 0 {
+				i := min(m.settingsWhitelistSelected, len(whitelist)-1)
+				if err := system.RemoveWhitelistApp(whitelist[i]); err != nil {
+					m.addToast("Failed to remove: "+err.Error(), toastError)
+				} else {
+					m.addToast("Removed "+whitelist[i], toastWarning)
+				}
+				m.settingsWhitelistSelected = max(0, m.settingsWhitelistSelected-1)
+			}
+		} else if m.settingsSelected == 4 {
+			browsers := system.GetCustomBrowsersList()
+			if len(browsers) > 0 {
+				i := min(m.settingsBrowserSelected, len(browsers)-1)
+				if err := system.RemoveCustomBrowser(browsers[i]); err != nil {
+					m.addToast("Failed to remove browser: "+err.Error(), toastError)
+				} else {
+					m.addToast("Removed "+browsers[i], toastWarning)
+				}
+				m.settingsBrowserSelected = max(0, m.settingsBrowserSelected-1)
+			}
+		}
+	}
+	return *m, nil
+}
+
+func (m *Model) renderSettings(width, height int) string {
+	auto, _, _ := system.GetAutoStartEnabled()
+	paused := storage.IsPaused()
+	browsers := append([]string{"chrome.exe", "firefox.exe", "msedge.exe"}, system.GetCustomBrowsersList()...)
+	whitelist := system.GetWhitelistApps()
+	dbPath, _ := storage.GetDBPath()
+	inner := max(20, width-6)
+
+	browserValue := truncate(strings.Join(browsers, "   "), max(12, inner-42)) + "   " + buttonText("+ Add Browser")
+	if m.settingsAddingBrowser {
+		browserValue = "New browser: [ " + cyanStyle.Render(padRight(m.settingsBrowserInput, 18)) + " ]"
+	}
+
+	whitelistValue := mutedStyle.Render("none") + "   " + buttonText("+ Add App")
+	if m.settingsAddingWhitelist {
+		whitelistValue = "App exe: [ " + cyanStyle.Render(padRight(m.settingsWhitelistInput, 18)) + " ]"
+	} else if len(whitelist) > 0 {
+		selected := min(m.settingsWhitelistSelected, len(whitelist)-1)
+		var wParts []string
+		for i, w := range whitelist {
+			if i == selected && m.settingsSelected == 3 {
+				wParts = append(wParts, redStyle.Render("["+w+"]"))
+			} else {
+				wParts = append(wParts, w)
+			}
+		}
+		whitelistValue = truncate(strings.Join(wParts, "  "), max(12, inner-42)) + "   " + buttonText("+ Add App")
+	}
+
+	lines := []string{
+		"DAEMON",
+		m.settingRow(0, m.settingsSelected, "Background service", statusPill(m.daemonActive)+"  "+buttonText(func() string {
+			if m.daemonActive {
+				return "Stop"
+			}
+			return "Start"
+		}()), inner),
+		m.settingRow(1, m.settingsSelected, "Auto-start on login", toggleText(auto), inner),
+		"",
+		"TRACKING",
+		m.settingRow(2, m.settingsSelected, "Browser tracking", toggleText(!paused), inner),
+		m.settingRow(3, m.settingsSelected, "Whitelisted apps", whitelistValue, inner),
+		m.settingRow(4, m.settingsSelected, "Tracked browsers", browserValue, inner),
+		"",
+		"DATA",
+		m.settingRow(5, m.settingsSelected, "Data retention", func() string {
+			days := storage.GetRetentionDays()
+			if m.settingsSelected == 5 {
+				return cyanStyle.Render(fmt.Sprintf("[ ← %d days → ]", days)) + " " + buttonText("Cycle Preset")
+			}
+			return fmt.Sprintf("%d days", days)
+		}(), inner),
+		m.settingRow(6, m.settingsSelected, "Database path", mutedStyle.Render(truncate(dbPath, max(10, inner-45)))+"   "+buttonText("Open Folder"), inner),
+		m.settingRow(7, m.settingsSelected, "Export data", renderExportButtons(m.settingsSelected == 7, m.settingsExportSelected)+"   "+mutedStyle.Render("→ Downloads"), inner),
+		m.settingRow(8, m.settingsSelected, "Update app", buttonText("Update from GitHub"), inner),
+		"",
+		"DANGER ZONE",
+		m.settingRow(9, m.settingsSelected, "Danger zone", redStyle.Bold(true).Render("[ Uninstall / Wipe All Data ]"), inner),
+	}
+	for i, line := range lines {
+		switch line {
+		case "DAEMON", "TRACKING", "DATA":
+			lines[i] = boldStyle.Render(line) + "\n" + mutedStyle.Render("────────────────────────────────────────")
+		case "DANGER ZONE":
+			lines[i] = redStyle.Bold(true).Render(line) + "\n" + redStyle.Render("────────────────────────────────────────")
+		}
+	}
+	bodyLines := strings.Split(strings.Join(lines, "\n"), "\n")
+	maxBodyLines := max(6, height-6)
+	if len(bodyLines) > maxBodyLines {
+		selectedLine := 0
+		for i, line := range bodyLines {
+			if strings.Contains(line, ">") {
+				selectedLine = i
+				break
+			}
+		}
+		start := scrollStart(selectedLine, maxBodyLines-2, len(bodyLines))
+		end := min(len(bodyLines), start+maxBodyLines-2)
+		window := bodyLines[start:end]
+		if start > 0 {
+			window = append([]string{mutedStyle.Render("↑ more")}, window...)
+		}
+		if end < len(bodyLines) {
+			window = append(window, mutedStyle.Render("↓ more"))
+		}
+		bodyLines = window
+	}
+
+	panel := panelWithHover("SETTINGS", "", width-2, "\n"+strings.Join(bodyLines, "\n")+"\n", true, m.hoveredPanel == 0)
+	m.clickableRegions = append(m.clickableRegions, clickableRegion{
+		X1: 0, Y1: m.contentTop, X2: lipgloss.Width(panel), Y2: m.clampBodyBottom(m.contentTop+lipgloss.Height(panel), height),
+		ID: "panel-0", Kind: "panel",
+	})
+
+	return panel
+}
+
+func (m *Model) settingRow(index, selected int, label, value string, width int) string {
+	cursor := "  "
+	if index == selected {
+		cursor = cyanStyle.Render("> ")
+	}
+	labelWidth := min(24, max(12, width/3))
+	line := cursor + padRight(label, labelWidth) + value
+	line = fitLine(line, width)
+	if index == selected {
+		return selectedRowStyle.Render(padRight(line, width))
+	}
+	return line
+}
+
+func statusPill(running bool) string {
+	if running {
+		return "[ " + greenStyle.Render("● RUNNING") + " ]"
+	}
+	return "[ " + redStyle.Render("○ STOPPED") + " ]"
+}
+
+func toggleText(on bool) string {
+	if on {
+		return "[" + greenStyle.Render("✓") + "] Enabled"
+	}
+	return "[" + mutedStyle.Render("·") + "] Disabled"
+}
+
+func buttonText(label string) string {
+	return cyanStyle.Render("[ " + label + " ]")
+}
+
+func openDBFolder() {
+	dbPath, err := storage.GetDBPath()
+	if err != nil {
+		return
+	}
+	exec.Command("explorer.exe", filepath.Dir(dbPath)).Start()
+}
+
+func launchGitHubUpdate() error {
+	exePath, err := os.Executable()
+	if err != nil {
+		return err
+	}
+	cmd := exec.Command("cmd", "/c", "start", "", exePath, "update")
+	return cmd.Start()
+}
+
+func exportData(jsonOut bool) (string, error) {
+	userProfile := os.Getenv("USERPROFILE")
+	if userProfile == "" {
+		return "", fmt.Errorf("USERPROFILE not set")
+	}
+	exportDir := filepath.Join(userProfile, "Downloads")
+	if err := os.MkdirAll(exportDir, 0755); err != nil {
+		exportDir = userProfile
+	}
+	if jsonOut {
+		path := filepath.Join(exportDir, "deepfocus_export.json")
+		apps, err := storage.GetAppStatsInRange("", "")
+		if err != nil {
+			return "", err
+		}
+		b, err := json.MarshalIndent(apps, "", "  ")
+		if err != nil {
+			return "", err
+		}
+		return path, os.WriteFile(path, b, 0644)
+	}
+	path := filepath.Join(exportDir, "deepfocus_export.csv")
+	apps, err := storage.GetAppStatsInRange("", "")
+	if err != nil {
+		return "", err
+	}
+	f, err := os.Create(path)
+	if err != nil {
+		return "", err
+	}
+	defer f.Close()
+	w := csv.NewWriter(f)
+	if err := w.Write([]string{"Date", "App Name", "Executable", "Duration (seconds)", "Open Count"}); err != nil {
+		return "", err
+	}
+	for _, app := range apps {
+		if err := w.Write([]string{app.Date, app.AppName, app.ExeName, strconv.Itoa(app.TotalDurationSecs), strconv.Itoa(app.OpenCount)}); err != nil {
+			return "", err
+		}
+	}
+	w.Flush()
+	if err := w.Error(); err != nil {
+		return "", err
+	}
+	return path, nil
+}
+
+func renderExportButtons(active bool, selectedButton int) string {
+	c := [2]string{"Export CSV", "Export JSON"}
+	s := [2]string{cyanStyle.Render("[ " + c[0] + " ]"), cyanStyle.Render("[ " + c[1] + " ]")}
+	if active {
+		s[selectedButton] = greenStyle.Render("[ " + c[selectedButton] + " ]")
+	}
+	return s[0] + "   " + s[1]
+}

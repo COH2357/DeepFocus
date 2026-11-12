@@ -1,0 +1,48 @@
+package cli
+
+import (
+	"fmt"
+	"focusd/coreapi"
+	"focusd/storage"
+	"focusd/ui"
+	"os"
+	"strconv"
+)
+
+func runFocus(args []string) {
+	if err := storage.Init(); err != nil {
+		ui.PrintError(fmt.Sprintf("Failed to initialize: %v", err))
+		os.Exit(1)
+	}
+	defer storage.Close()
+
+	minutes := 25
+	if len(args) > 2 {
+		if m, err := strconv.Atoi(args[2]); err == nil && m > 0 {
+			minutes = min(m, coreapi.MaxPomodoroMinutes)
+		}
+	}
+
+	if err := coreapi.StartPomodoro(minutes); err != nil {
+		ui.PrintError(fmt.Sprintf("Failed to start timer: %v", err))
+		return
+	}
+
+	ui.PrintHeader()
+	ui.PrintOK(fmt.Sprintf("Focus timer started for %d minutes.", minutes))
+	fmt.Println("You will be notified when it completes; run 'deepfocus status' if the daemon is stopped.")
+}
+
+func runStopTimer() {
+	if err := storage.Init(); err != nil {
+		ui.PrintError(fmt.Sprintf("Failed to initialize: %v", err))
+		os.Exit(1)
+	}
+	defer storage.Close()
+
+	if err := coreapi.StopPomodoro(); err != nil {
+		ui.PrintError(fmt.Sprintf("Failed to stop timer: %v", err))
+		return
+	}
+	ui.PrintOK("Timer stopped.")
+}

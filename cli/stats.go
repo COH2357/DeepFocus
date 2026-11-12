@@ -1,0 +1,110 @@
+package cli
+
+import (
+	"fmt"
+	"focusd/coreapi"
+	"focusd/storage"
+	"focusd/ui"
+	"os"
+)
+
+func runStats() {
+	if err := storage.Init(); err != nil {
+		ui.PrintError(fmt.Sprintf("Failed to initialize: %v", err))
+		os.Exit(1)
+	}
+	defer storage.Close()
+
+	coreapi.SendIPCCmd("flush")
+
+	today := storage.Today()
+	summary, err := coreapi.GetDailySummary(today)
+	if err != nil {
+		ui.PrintError(fmt.Sprintf("Failed to read stats: %v", err))
+		os.Exit(1)
+	}
+	if summary.AppCount == 0 {
+		ui.PrintInfo("No data recorded yet. Start tracking with 'deepfocus' command.")
+		return
+	}
+
+	displayStats(summary)
+}
+
+func displayStats(summary *coreapi.DailySummary) {
+	header := fmt.Sprintf("Stats: %s", summary.Date)
+	ui.PrintSectionHeader(header)
+
+	if summary.AppCount == 0 {
+		fmt.Println("  No data recorded for this period.")
+		fmt.Println()
+		return
+	}
+
+	ui.PrintStatus("Total Screen Time", ui.FormatDuration(summary.TotalAppTime), false)
+	ui.PrintStatus("Apps Used", fmt.Sprintf("%d", summary.AppCount), false)
+	fmt.Println()
+
+	ui.PrintSectionHeader("Top Apps")
+	if len(summary.TopApps) == 0 {
+		fmt.Println("  No app data recorded.")
+	} else {
+		columns := []ui.TableColumn{
+			{Header: "App", Width: 53},
+			{Header: "Time", Width: 12},
+			{Header: "Visits", Width: 8},
+		}
+		var rows [][]string
+		for _, app := range summary.TopApps {
+			rows = append(rows, []string{
+				ui.TruncateString(app.AppName, 53),
+				ui.FormatDurationShort(app.TotalDurationSecs),
+				fmt.Sprintf("%d", app.OpenCount),
+			})
+		}
+		ui.PrintTable(columns, rows)
+	}
+	fmt.Println()
+
+	if len(summary.GroupedSites) > 0 {
+		ui.PrintSectionHeader("Top Browsing (Grouped)")
+		for _, group := range summary.GroupedSites {
+			if len(group.SubEntries) > 1 {
+				fmt.Printf("  %s%-40s%s  %s%s%s\n",
+					ui.Cyan, ui.TruncateString(group.Category, 40), ui.Reset,
+					ui.Green, ui.FormatDurationShort(group.TotalSecs), ui.Reset)
+				for i, sub := range group.SubEntries {
+					prefix := "├─"
+					if i == len(group.SubEntries)-1 {
+						prefix = "└─"
+					}
+					fmt.Printf("    %s %s%-36s%s  %s\n",
+						prefix, ui.Dim, ui.TruncateString(sub.Title, 36), ui.Reset,
+						ui.FormatDurationShort(sub.Duration))
+				}
+			} else {
+				fmt.Printf("  %-40s  %s%s%s\n",
+					ui.TruncateString(group.Category, 40),
+					ui.Green, ui.FormatDurationShort(group.TotalSecs), ui.Reset)
+			}
+		}
+		fmt.Println()
+	} else if len(summary.TopSites) > 0 {
+		ui.PrintSectionHeader("Top Sites")
+		columns := []ui.TableColumn{
+			{Header: "Site", Width: 53},
+			{Header: "Time", Width: 12},
+			{Header: "Visits", Width: 8},
+		}
+		var rows [][]string
+		for _, site := range summary.TopSites {
+			rows = append(rows, []string{
+				ui.TruncateString(site.AppName, 53),
+				ui.FormatDurationShort(site.TotalDurationSecs),
+				fmt.Sprintf("%d", site.OpenCount),
+			})
+		}
+		ui.PrintTable(columns, rows)
+		fmt.Println()
+	}
+}

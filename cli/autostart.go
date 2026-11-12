@@ -1,0 +1,43 @@
+package cli
+
+import (
+	"fmt"
+	"focusd/system"
+	"focusd/ui"
+	"os"
+)
+
+func runAutostartEnable() {
+	if err := system.EnableAutoStart(); err != nil {
+		ui.PrintError(fmt.Sprintf("Failed to enable auto-start: %v", err))
+		os.Exit(1)
+	}
+	ui.PrintOK("Auto-start enabled.")
+	fmt.Println("deepfocus will start automatically on Windows boot.")
+	fmt.Println("Visible in Task Manager → Startup tab.")
+}
+
+func runAutostartDisable() {
+	if err := system.DisableAutoStart(); err != nil {
+		ui.PrintError(fmt.Sprintf("Failed to disable auto-start: %v", err))
+		os.Exit(1)
+	}
+	ui.PrintOK("Auto-start disabled.")
+}
+
+func runAutostartStatus() {
+	enabled, path, err := system.GetAutoStartEnabled()
+	if err != nil {
+		ui.PrintError(fmt.Sprintf("Failed to check auto-start status: %v", err))
+		os.Exit(1)
+	}
+
+	if enabled {
+		ui.PrintInfo("Auto-start is ENABLED")
+		fmt.Printf("Executable: %s\n", path)
+		fmt.Println("deepfocus will start automatically on Windows boot.")
+	} else {
+		ui.PrintInfo("Auto-start is DISABLED")
+		fmt.Println("Run 'deepfocus autostart enable' to enable auto-start.")
+	}
+}
