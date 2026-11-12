@@ -8,7 +8,7 @@
 ![Platform](https://img.shields.io/badge/Platform-Windows_x64-000000.svg?style=for-the-badge&logo=nsis&logoColor=white&labelColor=000000&color=000000)
 
 <p align="center">
-  <img src="website/assets/focusd-icon.svg" width="128" alt="focusd icon">
+  <img src="website/assets/deepfocus-icon.svg" width="128" alt="DeepFocus icon">
 </p>
 
 <h3 align="center">Privacy-First Digital Wellbeing for Windows</h3>
