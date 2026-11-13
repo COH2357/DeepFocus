@@ -722,7 +722,7 @@
         (apps.length ? '<div class="app-list">' + appRows + "</div>" : emptyState("layers", t("dash.noApps"), t("dash.noAppsSub"))) +
       "</div>";
 
-    const sitesCard = renderSitesCard(o.sites || [], o.total);
+    const sitesCard = renderSitesCard(o.sites || []);
 
     const hourly = renderHourly(o.hourly || [], o.date);
     const hourlyCard =
@@ -783,7 +783,7 @@
       '<circle cx="' + last[0].toFixed(1) + '" cy="' + last[1].toFixed(1) + '" r="3.2" vector-effect="non-scaling-stroke"/></svg>';
   }
 
-  function renderSitesCard(sites, total) {
+  function renderSitesCard(sites) {
     if (!sites.length) {
       return '<div class="card"><div class="card-head"><div class="card-title">' + icon("globe") + esc(t("dash.topSites")) + "</div></div>" +
         emptyState("globe", t("dash.noSites"), t("dash.noSitesSub")) + "</div>";
@@ -791,7 +791,7 @@
     const colors = ["var(--accent)", "var(--brick)", "var(--green)", "var(--amber)", "var(--muted)"];
     const top = sites.slice(0, 4);
     const restSeconds = sites.slice(4).reduce(function (sum, s) { return sum + s.seconds; }, 0);
-    const totalSites = total || sites.reduce(function (sum, s) { return sum + s.seconds; }, 0) || 1;
+    const totalSites = sites.reduce(function (sum, s) { return sum + s.seconds; }, 0) || 1;
     let acc = 0;
     const stops = [];
     top.forEach(function (site, i) {
