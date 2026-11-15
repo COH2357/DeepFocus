@@ -18,6 +18,8 @@ type UserConfig struct {
 	BreakReminderEnabled  bool           `json:"break_reminder_enabled"`
 	BreakReminderMinutes  int            `json:"break_reminder_minutes"`
 	AppTimeLimits         map[string]int `json:"app_time_limits"`
+	SiteTimeLimits        map[string]int `json:"site_time_limits"`
+	Language              string         `json:"language"`
 	PomodoroMinutes       int            `json:"pomodoro_minutes"`
 	SnoozeDurationMinutes int            `json:"snooze_duration_minutes"`
 	CustomBrowsers        []string       `json:"custom_browsers"`
@@ -46,6 +48,8 @@ type userConfigFile struct {
 	BreakReminderEnabled  bool              `json:"break_reminder_enabled"`
 	BreakReminderMinutes  int               `json:"break_reminder_minutes"`
 	AppTimeLimits         map[string]int    `json:"app_time_limits"`
+	SiteTimeLimits        map[string]int    `json:"site_time_limits"`
+	Language              string            `json:"language"`
 	PomodoroMinutes       int               `json:"pomodoro_minutes"`
 	SnoozeDurationMinutes int               `json:"snooze_duration_minutes"`
 	CustomBrowsers        []string          `json:"custom_browsers"`
@@ -86,6 +90,8 @@ func defaultUserConfig() *UserConfig {
 		BreakReminderEnabled:  false,
 		BreakReminderMinutes:  60,
 		AppTimeLimits:         make(map[string]int),
+		SiteTimeLimits:        make(map[string]int),
+		Language:              "",
 		PomodoroMinutes:       25,
 		SnoozeDurationMinutes: 60,
 		CustomBrowsers:        []string{},
@@ -141,6 +147,8 @@ func reloadFromDiskLocked(force bool) {
 			userConfig.BreakReminderEnabled = temp.BreakReminderEnabled
 			userConfig.BreakReminderMinutes = temp.BreakReminderMinutes
 			userConfig.AppTimeLimits = temp.AppTimeLimits
+			userConfig.SiteTimeLimits = temp.SiteTimeLimits
+			userConfig.Language = temp.Language
 			userConfig.PomodoroMinutes = temp.PomodoroMinutes
 			userConfig.SnoozeDurationMinutes = temp.SnoozeDurationMinutes
 			userConfig.CustomBrowsers = temp.CustomBrowsers
@@ -173,6 +181,9 @@ func reloadFromDiskLocked(force bool) {
 
 	if userConfig.AppTimeLimits == nil {
 		userConfig.AppTimeLimits = make(map[string]int)
+	}
+	if userConfig.SiteTimeLimits == nil {
+		userConfig.SiteTimeLimits = make(map[string]int)
 	}
 	if userConfig.CustomBrowsers == nil {
 		userConfig.CustomBrowsers = []string{}
@@ -453,6 +464,70 @@ func SetAppTimeLimit(exeName string, minutes int) error {
 		userConfig.AppTimeLimits[exeName] = minutes
 	}
 	return saveUserConfigLocked()
+}
+
+func GetSiteTimeLimits() map[string]int {
+	loadFromDisk()
+	configMu.RLock()
+	defer configMu.RUnlock()
+	limits := make(map[string]int, len(userConfig.SiteTimeLimits))
+	for k, v := range userConfig.SiteTimeLimits {
+		limits[k] = v
+	}
+	return limits
+}
+
+// SetSiteTimeLimit stores a browser-site limit for a normalized site class
+// (for example "bilibili"). Zero removes it.
+func SetSiteTimeLimit(siteClass string, minutes int) error {
+	release, err := beginConfigUpdate()
+	if err != nil {
+		return err
+	}
+	defer release()
+	siteClass = strings.ToLower(strings.TrimSpace(siteClass))
+	if siteClass == "" {
+		return fmt.Errorf("invalid site class")
+	}
+	if minutes <= 0 {
+		delete(userConfig.SiteTimeLimits, siteClass)
+	} else {
+		userConfig.SiteTimeLimits[siteClass] = minutes
+	}
+	return saveUserConfigLocked()
+}
+
+// GetLanguage returns the explicit UI language, or the Windows UI language
+// when the setting is "auto". Notifications, the tray menu and the CLI use the
+// same value as the desktop app.
+func GetLanguage() string {
+	loadFromDisk()
+	configMu.RLock()
+	lang := strings.ToLower(strings.TrimSpace(userConfig.Language))
+	configMu.RUnlock()
+	if lang == "zh" || lang == "en" {
+		return lang
+	}
+	return systemLanguage()
+}
+
+func SetLanguage(lang string) error {
+	lang = strings.ToLower(strings.TrimSpace(lang))
+	if lang != "zh" && lang != "en" && lang != "auto" && lang != "" {
+		return fmt.Errorf("invalid language")
+	}
+	release, err := beginConfigUpdate()
+	if err != nil {
+		return err
+	}
+	defer release()
+	userConfig.Language = lang
+	return saveUserConfigLocked()
+}
+
+// UseChinese reports whether user-facing runtime strings should be Chinese.
+func UseChinese() bool {
+	return GetLanguage() == "zh"
 }
 
 func GetPomodoroMinutes() int {

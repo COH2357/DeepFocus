@@ -97,6 +97,15 @@ type limitEntry struct {
 	Status      string `json:"status"`
 }
 
+type siteLimitEntry struct {
+	Key         string `json:"key"`
+	Label       string `json:"label"`
+	Minutes     int    `json:"minutes"`
+	UsedSeconds int    `json:"usedSeconds"`
+	Percent     int    `json:"percent"`
+	Status      string `json:"status"`
+}
+
 type reminderSettings struct {
 	Enabled bool `json:"enabled"`
 	Minutes int  `json:"minutes"`
@@ -135,6 +144,8 @@ type settingsData struct {
 	ArchiveDir       string           `json:"archiveDir"`
 	ArchiveCount     int              `json:"archiveCount"`
 	ArchiveLatest    string           `json:"archiveLatest"`
+	QuoteCount       int              `json:"quoteCount"`
+	Language         string           `json:"language"`
 }
 
 func (a *app) settingsSnapshot() settingsData {
@@ -144,6 +155,7 @@ func (a *app) settingsSnapshot() settingsData {
 	limits, _ := a.buildLimits()
 	archiveDir, _ := storage.GetArchiveDir()
 	archiveCount, archiveLatest := storage.ArchiveSummary()
+	quotes, _ := storage.ListBlockQuotes()
 	return settingsData{
 		Version:          a.version,
 		DBPath:           dbPath,
@@ -180,6 +192,8 @@ func (a *app) settingsSnapshot() settingsData {
 		ArchiveDir:       archiveDir,
 		ArchiveCount:     archiveCount,
 		ArchiveLatest:    archiveLatest,
+		QuoteCount:       len(quotes),
+		Language:         system.GetLanguage(),
 	}
 }
 
@@ -530,6 +544,34 @@ func activeSession() *sessionEntry {
 		Date:    active.Date,
 		Active:  true,
 	}
+}
+
+func buildSiteLimitEntries() []siteLimitEntry {
+	limits := system.GetSiteTimeLimits()
+	out := make([]siteLimitEntry, 0, len(limits))
+	for key, minutes := range limits {
+		used := coreapi.SiteUsageTodaySeconds(key)
+		percent := 0
+		if minutes > 0 {
+			percent = used * 100 / (minutes * 60)
+		}
+		status := "ok"
+		if percent >= 95 {
+			status = "over"
+		} else if percent >= 80 {
+			status = "warn"
+		}
+		out = append(out, siteLimitEntry{
+			Key:         key,
+			Label:       coreapi.SiteClassDisplay(key),
+			Minutes:     minutes,
+			UsedSeconds: used,
+			Percent:     percent,
+			Status:      status,
+		})
+	}
+	sort.Slice(out, func(i, j int) bool { return out[i].Key < out[j].Key })
+	return out
 }
 
 func (a *app) buildLimits() ([]limitEntry, error) {

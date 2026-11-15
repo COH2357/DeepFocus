@@ -24,6 +24,7 @@ type app struct {
 	// debug keeps the WebView2 context menu and devtools available and prints
 	// the session URL; enabled with FOCUSD_GUI_DEBUG=1.
 	debug bool
+	block *BlockOptions
 }
 
 func startServer(a *app) (string, func(), error) {
@@ -39,11 +40,25 @@ func startServer(a *app) (string, func(), error) {
 	// API then requires it on every request. Keeping it out of a separate file
 	// means an unauthenticated local process cannot read it from disk.
 	page := strings.ReplaceAll(string(indexHTML), "__FOCUSD_TOKEN__", a.token)
+	blockHTML, _ := fs.ReadFile(assets, "block.html")
+	blockPage := strings.ReplaceAll(string(blockHTML), "__FOCUSD_TOKEN__", a.token)
 
 	static := http.FileServer(http.FS(assets))
 	mux := http.NewServeMux()
 	mux.HandleFunc("/api/", a.handleAPI)
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/block" && a.block != nil {
+			if !a.authorizePage(w, r) {
+				http.Error(w, "Open DeepFocus to use this page.", http.StatusForbidden)
+				return
+			}
+			a.touch()
+			w.Header().Set("Content-Type", "text/html; charset=utf-8")
+			w.Header().Set("Cache-Control", "no-store")
+			setSecurityHeaders(w)
+			_, _ = w.Write([]byte(blockPage))
+			return
+		}
 		if r.URL.Path == "/" {
 			if !a.authorizePage(w, r) {
 				http.Error(w, "Open the DeepFocus window to use this page.", http.StatusForbidden)
@@ -140,6 +155,29 @@ func (a *app) handleAPI(w http.ResponseWriter, r *http.Request) {
 
 	var err error
 	path := r.URL.Path
+	if a.block != nil {
+		switch {
+		case path == "/api/block/info" && r.Method == http.MethodGet:
+			err = a.blockInfo(w, r)
+		case path == "/api/block/bypass" && r.Method == http.MethodPost:
+			err = a.blockBypass(w, r)
+		case path == "/api/block/close" && r.Method == http.MethodPost:
+			err = a.blockClose(w, r)
+		case path == "/api/block/leave" && r.Method == http.MethodPost:
+			err = a.blockLeave(w, r)
+		case path == "/api/block/dragstart" && r.Method == http.MethodPost:
+			err = a.blockDragStart(w, r)
+		default:
+			writeError(w, http.StatusNotFound, "not found")
+			return
+		}
+		if err != nil {
+			log.Printf("gui: %s %s: %v", r.Method, path, err)
+			writeError(w, http.StatusInternalServerError, err.Error())
+		}
+		return
+	}
+
 	switch {
 	case path == "/api/bootstrap" && r.Method == http.MethodGet:
 		err = a.bootstrap(w, r)
@@ -155,6 +193,8 @@ func (a *app) handleAPI(w http.ResponseWriter, r *http.Request) {
 		err = a.settings(w, r)
 	case path == "/api/pomodoro" && r.Method == http.MethodGet:
 		err = a.pomodoro(w, r)
+	case path == "/api/quotes" && r.Method == http.MethodGet:
+		err = a.quotes(w, r)
 	case path == "/api/actions" && r.Method == http.MethodPost:
 		err = a.action(w, r)
 	default:

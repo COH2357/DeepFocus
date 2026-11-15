@@ -95,3 +95,10 @@ func TestOpenProcessForKillSelf(t *testing.T) {
 		t.Fatal("expected a non-empty image path")
 	}
 }
+
+func TestProcessAgeForSelf(t *testing.T) {
+	age := ProcessAge(uint32(os.Getpid()))
+	if age <= 0 {
+		t.Fatalf("ProcessAge(self) = %v; want > 0", age)
+	}
+}

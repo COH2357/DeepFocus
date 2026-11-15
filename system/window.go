@@ -3,6 +3,7 @@ package system
 import (
 	"path/filepath"
 	"syscall"
+	"time"
 	"unsafe"
 )
 
@@ -17,6 +18,9 @@ var (
 	procOpenProcess              = kernel32.NewProc("OpenProcess")
 	procCloseHandle              = kernel32.NewProc("CloseHandle")
 	procGetModuleBaseNameW       = psapi.NewProc("GetModuleBaseNameW")
+	procShowWindow               = user32.NewProc("ShowWindow")
+	procSetForegroundWindow      = user32.NewProc("SetForegroundWindow")
+	procKeybdEvent               = user32.NewProc("keybd_event")
 )
 
 const (
@@ -25,6 +29,8 @@ const (
 )
 
 type WindowInfo struct {
+	HWND    uintptr
+	PID     uint32
 	Title   string
 	ExeName string
 	ExePath string
@@ -63,6 +69,8 @@ func GetForegroundWindowInfo() (*WindowInfo, error) {
 	id := ResolveIdentity(exeName, exePath)
 
 	return &WindowInfo{
+		HWND:    hwnd,
+		PID:     pid,
 		Title:   title,
 		ExeName: exeName,
 		ExePath: exePath,
@@ -114,4 +122,42 @@ func getProcessName(pid uint32) string {
 		return ""
 	}
 	return syscall.UTF16ToString(buf)
+}
+
+const (
+	swMinimize = 6
+	swRestore  = 9
+)
+
+// MinimizeWindow asks Windows to minimize a top-level window. The guard uses
+// this instead of terminating the app so unsaved work is never destroyed.
+func MinimizeWindow(hwnd uintptr) {
+	if hwnd != 0 {
+		procShowWindow.Call(hwnd, swMinimize)
+	}
+}
+
+// RestoreWindow brings a minimized app back after an explicit bypass.
+func RestoreWindow(hwnd uintptr) {
+	if hwnd != 0 {
+		procShowWindow.Call(hwnd, swRestore)
+	}
+}
+
+// CloseActiveTab restores a browser window and sends Ctrl+W. The site blocker
+// uses it for its "leave this page" action so the user is not left staring at
+// the page that hit the limit; the limit itself is not bypassed.
+func CloseActiveTab(hwnd uintptr) {
+	if hwnd == 0 {
+		return
+	}
+	RestoreWindow(hwnd)
+	procSetForegroundWindow.Call(hwnd)
+	time.Sleep(180 * time.Millisecond)
+	const vkControl = 0x11
+	const keyUp = 0x0002
+	procKeybdEvent.Call(vkControl, 0, 0, 0)
+	procKeybdEvent.Call('W', 0, 0, 0)
+	procKeybdEvent.Call('W', 0, keyUp, 0)
+	procKeybdEvent.Call(vkControl, 0, keyUp, 0)
 }

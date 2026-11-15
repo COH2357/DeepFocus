@@ -86,7 +86,7 @@ func TestToastEnvPassesRawValues(t *testing.T) {
 func TestToastXMLIsWellFormed(t *testing.T) {
 	for name, tmpl := range map[string]string{
 		"plain":  toastXMLTemplate,
-		"action": actionToastXMLTemplate,
+		"action": actionToastXML(),
 	} {
 		t.Run(name, func(t *testing.T) {
 			dec := xml.NewDecoder(strings.NewReader(tmpl))

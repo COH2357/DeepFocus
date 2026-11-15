@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"focusd/storage"
+	"focusd/system"
 	"log"
 	"os"
 	"path/filepath"
@@ -163,7 +164,11 @@ func CheckPomodoroAndNotify(notifyFn func(title, msg string) bool) {
 			return
 		}
 
-		if notifyFn != nil && !notifyFn("Pomodoro Complete!", "Great work! Take a break.") {
+		title, msg := "Pomodoro Complete!", "Great work! Take a break."
+		if system.UseChinese() {
+			title, msg = "专注完成", "做得很好，休息一下吧。"
+		}
+		if notifyFn != nil && !notifyFn(title, msg) {
 			// The toast was throttled; leave the timer un-notified so the next
 			// check retries instead of dropping the only completion alert.
 			return

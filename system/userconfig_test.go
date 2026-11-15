@@ -294,3 +294,34 @@ func TestBuiltinExcludedApps(t *testing.T) {
 		}
 	}
 }
+
+func TestLanguageAndSiteLimitsRoundTrip(t *testing.T) {
+	setupConfigEnv(t)
+	if err := SetLanguage("zh"); err != nil {
+		t.Fatal(err)
+	}
+	if got := GetLanguage(); got != "zh" {
+		t.Fatalf("language = %q; want zh", got)
+	}
+	if !UseChinese() {
+		t.Fatal("UseChinese should be true")
+	}
+	if err := SetLanguage("en"); err != nil {
+		t.Fatal(err)
+	}
+	if got := GetLanguage(); got != "en" {
+		t.Fatalf("language = %q; want en", got)
+	}
+	if err := SetSiteTimeLimit("Bilibili", 45); err != nil {
+		t.Fatal(err)
+	}
+	if got := GetSiteTimeLimits()["bilibili"]; got != 45 {
+		t.Fatalf("site limit = %d; want 45", got)
+	}
+	if err := SetSiteTimeLimit("bilibili", 0); err != nil {
+		t.Fatal(err)
+	}
+	if _, ok := GetSiteTimeLimits()["bilibili"]; ok {
+		t.Fatal("zero should remove the site limit")
+	}
+}

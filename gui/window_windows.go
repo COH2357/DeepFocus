@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"sync/atomic"
 	"time"
 	"unsafe"
 
@@ -29,9 +30,38 @@ var (
 	procShowWindowW                   = user32dll.NewProc("ShowWindow")
 	procSetForegroundWindowW          = user32dll.NewProc("SetForegroundWindow")
 	procDwmSetWindowAttribute         = dwmapi.NewProc("DwmSetWindowAttribute")
+	procGetWindowLongPtrW             = user32dll.NewProc("GetWindowLongPtrW")
+	procSendMessageW                  = user32dll.NewProc("SendMessageW")
+	procReleaseCapture                = user32dll.NewProc("ReleaseCapture")
+	procGetWindowRect                 = user32dll.NewProc("GetWindowRect")
+	procGetAsyncKeyState              = user32dll.NewProc("GetAsyncKeyState")
 )
 
-const swRestoreWindow = 9
+const (
+	swRestoreWindow  = 9
+	swMaximizeWindow = 3
+)
+
+const (
+	wmSysCommand    = 0x0112
+	scMinimize      = 0xf020
+	scClose         = 0xf060
+	scMove          = 0xf010
+	gwlStyle        = ^uintptr(15) // -16
+	gwlExStyle      = ^uintptr(19) // -20
+	gwlpWndProc     = ^uintptr(3)  // -4
+	wsPopup         = 0x80000000
+	wsVisible       = 0x10000000
+	wsCaption       = 0x00c00000
+	wsThickFrame    = 0x00040000
+	wsMinimizeBox   = 0x00020000
+	wsMaximizeBox   = 0x00010000
+	wsSysMenu       = 0x00080000
+	wsExToolWin     = 0x00000080
+	swpFrameChanged = 0x0020
+	wmNCLButtonDown = 0x00a1
+	htCaption       = 2
+)
 
 const (
 	dwmwaUseImmersiveDarkMode    = 20
@@ -302,4 +332,124 @@ func ShowFatal(err error) {
 // setTitleBarTheme keeps the native frame in sync with the in-app theme.
 func setTitleBarTheme(dark bool) {
 	applyTitleBarTheme(dark)
+}
+
+type blockRect struct {
+	left, top, right, bottom int32
+}
+
+var (
+	blockWindowHWND uintptr
+	blockOldProc    uintptr
+	blockCanClose   atomic.Bool
+	blockDragging   atomic.Bool
+)
+
+func blockerWindowProc(hwnd uintptr, msg uint32, wParam, lParam uintptr) uintptr {
+	switch msg {
+	case wmClose:
+		if !blockCanClose.Load() {
+			return 0
+		}
+	case wmSysCommand:
+		cmd := wParam & 0xfff0
+		if cmd == scMinimize || cmd == scClose {
+			return 0
+		}
+	}
+	return callWindowProc(blockOldProc, hwnd, msg, wParam, lParam)
+}
+
+func removeBlockerFrame(hwnd uintptr) {
+	style, _, _ := procGetWindowLongPtrW.Call(hwnd, gwlStyle)
+	style &^= wsCaption | wsThickFrame | wsMinimizeBox | wsMaximizeBox | wsSysMenu
+	style |= wsPopup | wsVisible
+	procSetWindowLongPtrW.Call(hwnd, gwlStyle, style)
+	ex, _, _ := procGetWindowLongPtrW.Call(hwnd, gwlExStyle)
+	procSetWindowLongPtrW.Call(hwnd, gwlExStyle, ex|wsExToolWin)
+	procSetWindowPos.Call(hwnd, ^uintptr(0), 0, 0, 0, 0, 0x0001|0x0002|0x0040|swpFrameChanged)
+}
+
+// openBlockerWindow is deliberately separate from the main window: it is
+// topmost, fills the work area, and never calls the single-instance check.
+func openBlockerWindow(url string, a *app) (err error) {
+	defer func() {
+		if r := recover(); r != nil {
+			showMessage("DeepFocus", "DeepFocus could not open its blocker window.")
+			err = errNoWindow
+		}
+	}()
+	enableDPIAwareness()
+	scale := float64(systemDPI()) / 96.0
+	width, height := 0, 0
+	compact := a != nil && a.block != nil && a.block.Kind == "app"
+	if compact {
+		width = int(560 * scale)
+		height = int(700 * scale)
+	} else if area, ok := workArea(); ok {
+		width = int(area.right - area.left)
+		height = int(area.bottom - area.top)
+	} else {
+		width, height = int(1120*scale), int(760*scale)
+	}
+	title := "DeepFocus · 停一下"
+	view := webview2.NewWithOptions(webview2.WebViewOptions{
+		DataPath:  webviewDataPath(),
+		AutoFocus: true,
+		WindowOptions: webview2.WindowOptions{
+			Title:  title,
+			Width:  uint(width),
+			Height: uint(height),
+			IconId: 1,
+			Center: true,
+		},
+	})
+	if view == nil {
+		return errNoWindow
+	}
+	defer view.Destroy()
+	hwnd := uintptr(view.Window())
+	blockWindowHWND = hwnd
+	blockCanClose.Store(false)
+	defer func() {
+		blockWindowHWND = 0
+		blockOldProc = 0
+	}()
+	blockOldProc, _, _ = procSetWindowLongPtrW.Call(hwnd, gwlpWndProc, windows.NewCallback(blockerWindowProc))
+	removeBlockerFrame(hwnd)
+	styleWindow(hwnd, false)
+	view.SetSize(440, 560, webview2.HintMin)
+	if compact {
+		x := 24
+		y := 24
+		w := int(560 * scale)
+		h := int(700 * scale)
+		if area, ok := workArea(); ok {
+			x = int(area.right) - w - 18
+			y = int(area.top) + 18
+			if x < 0 {
+				x = 18
+			}
+		}
+		procSetWindowPos.Call(hwnd, ^uintptr(0), uintptr(x), uintptr(y), uintptr(w), uintptr(h), 0x0040)
+	} else {
+		procShowWindowW.Call(hwnd, swMaximizeWindow)
+		procSetWindowPos.Call(hwnd, ^uintptr(0), 0, 0, 0, 0, 0x0001|0x0002|0x0040)
+	}
+	view.Navigate(url)
+	view.Run()
+	return nil
+}
+
+func hideBlockWindow() {
+	if blockWindowHWND != 0 {
+		procShowWindowW.Call(blockWindowHWND, 0)
+	}
+}
+
+func closeBlockWindow() {
+	if blockWindowHWND != 0 {
+		blockCanClose.Store(true)
+		procPostMessageW.Call(blockWindowHWND, wmClose, 0, 0)
+	}
 }

@@ -339,3 +339,33 @@ func TestGroupBrowserStatsByDomain(t *testing.T) {
 		t.Errorf("example group = %d; want 50", byCategory["example"])
 	}
 }
+
+func TestSiteClassFromInput(t *testing.T) {
+	cases := map[string]string{
+		"bilibili.com": "bilibili",
+		"https://www.bilibili.com/video/BV1xx411c7mD": "bilibili",
+		"https://m.bilibili.com":                      "bilibili",
+		"b23.tv":                                      "bilibili",
+		"bilibili":                                    "bilibili",
+		"https://example.com/some/page":               "example",
+		"docs.example.com":                            "example",
+	}
+	for input, want := range cases {
+		got, err := SiteClassFromInput(input)
+		if err != nil || got != want {
+			t.Errorf("SiteClassFromInput(%q) = %q, %v; want %q", input, got, err, want)
+		}
+	}
+	if _, err := SiteClassFromInput("   "); err == nil {
+		t.Error("empty input should be rejected")
+	}
+}
+
+func TestSiteClassForTitle(t *testing.T) {
+	if got := SiteClassForTitle("【明日方舟】新活动攻略 - 哔哩哔哩"); got != "bilibili" {
+		t.Errorf("bilibili title = %q", got)
+	}
+	if got := SiteClassForTitle("Some random document.pdf"); got == "bilibili" {
+		t.Errorf("unrelated title mapped to %q", got)
+	}
+}

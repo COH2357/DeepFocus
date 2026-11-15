@@ -103,12 +103,15 @@ func (t *Tracker) Start() error {
 	persistTicker := time.NewTicker(5 * time.Minute)
 	retentionTicker := time.NewTicker(1 * time.Hour)
 	focusTicker := time.NewTicker(5 * time.Second)
+	guardTicker := time.NewTicker(1 * time.Second)
 	defer pollTicker.Stop()
 	defer persistTicker.Stop()
 	defer retentionTicker.Stop()
 	defer focusTicker.Stop()
+	defer guardTicker.Stop()
 
 	storage.MaintainHistory()
+	guard := &blockGuard{}
 
 	var stateMu sync.Mutex
 	var continuousUseStart time.Time
@@ -121,6 +124,7 @@ func (t *Tracker) Start() error {
 	for {
 		select {
 		case <-t.ctx.Done():
+			guard.stop()
 			t.flushCurrentSession()
 			t.flushPendingSessions()
 			clearActiveSessionLogged()
@@ -162,6 +166,8 @@ func (t *Tracker) Start() error {
 			t.persistActiveSession()
 		case <-retentionTicker.C:
 			storage.MaintainHistory()
+		case <-guardTicker.C:
+			guard.enforce()
 		case <-focusTicker.C:
 			CheckPomodoroCompletion()
 
@@ -184,8 +190,8 @@ func (t *Tracker) Start() error {
 					// Reset the anchor only once the toast actually goes out:
 					// resetting it before a throttled notify dropped the
 					// reminder for another full interval.
-					if showNotificationWithAction(notifyContext, "Break Reminder",
-						fmt.Sprintf("You've been working for %d min. Take a break!", mins),
+					if showNotificationWithAction(notifyContext, tr("Break Reminder", "休息提醒"),
+						fmt.Sprintf(tr("You've been working for %d min. Take a break!", "你已经连续使用 %d 分钟，起来活动一下。"), mins),
 						func(disable bool) {
 							if disable {
 								stateMu.Lock()
@@ -256,8 +262,8 @@ func (t *Tracker) Start() error {
 						// Arm the guard only once the toast actually goes out:
 						// arming it before a throttled notify dropped the alert
 						// until the app was switched away and back.
-						if showNotificationWithAction(notifyContext, "App Time Limit",
-							sessionAppName+" has exceeded daily limit!",
+						if showNotificationWithAction(notifyContext, tr("App Time Limit", "应用时限"),
+							fmt.Sprintf(tr("%s has exceeded its daily limit!", "%s 已超过今日使用上限。"), sessionAppName),
 							func(disable bool) {
 								if disable {
 									stateMu.Lock()

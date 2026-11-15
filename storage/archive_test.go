@@ -2,6 +2,7 @@ package storage
 
 import (
 	"database/sql"
+	"errors"
 	"os"
 	"path/filepath"
 	"testing"
@@ -172,5 +173,38 @@ func TestMaintainHistorySkipsRetentionWhenEnabled(t *testing.T) {
 	}
 	if files, _ := ListArchiveFiles(); len(files) != 1 {
 		t.Fatalf("got %d archives, want 1", len(files))
+	}
+}
+
+func TestBlockQuotesSeedAndLastQuoteGuard(t *testing.T) {
+	setupStorageEnv(t)
+	quotes, err := ListBlockQuotes()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(quotes) == 0 {
+		t.Fatal("default quotes were not seeded")
+	}
+	text := "测试语录"
+	id, err := AddBlockQuote(text)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := UpdateBlockQuote(id, text+"更新"); err != nil {
+		t.Fatal(err)
+	}
+	if err := DeleteBlockQuote(id); err != nil {
+		t.Fatal(err)
+	}
+	// Delete all but one, then the last deletion must be refused.
+	left, _ := ListBlockQuotes()
+	for len(left) > 1 {
+		if err := DeleteBlockQuote(left[0].ID); err != nil {
+			t.Fatal(err)
+		}
+		left, _ = ListBlockQuotes()
+	}
+	if err := DeleteBlockQuote(left[0].ID); !errors.Is(err, ErrLastQuote) {
+		t.Fatalf("last quote delete = %v; want ErrLastQuote", err)
 	}
 }

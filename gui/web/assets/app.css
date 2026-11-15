@@ -1000,3 +1000,24 @@ h1 { overflow-wrap: anywhere; text-wrap: balance; }
   .setting-row { gap: 10px; }
   .setting-control { width: 100%; justify-content: flex-start; }
 }
+
+
+/* Site limits, block events, quote editor */
+.site-limit-form { display: flex; gap: 8px; align-items: center; margin-top: 14px; flex-wrap: wrap; }
+.site-limit-form .input:first-child { flex: 1; min-width: 180px; }
+.site-limits .limit-row { margin-top: 10px; }
+.event-row { display: grid; grid-template-columns: 128px 78px minmax(0,1fr) minmax(0,1.1fr); gap: 10px; align-items: center; padding: 9px 0; border-top: 1px solid var(--line); font-size: 12px; }
+.event-row:first-of-type { border-top: 0; }
+.event-time { font-family: var(--mono); font-size: 10.5px; color: var(--faint); white-space: nowrap; }
+.event-action { font-size: 10.5px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; color: var(--green); }
+.event-action.bypassed { color: var(--brick); }
+.event-row b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.event-reason { color: var(--muted); overflow-wrap: anywhere; }
+.quote-edit-list { display: flex; flex-direction: column; gap: 10px; max-height: 52vh; overflow-y: auto; padding-right: 4px; }
+.quote-edit { display: flex; gap: 8px; align-items: flex-start; }
+.quote-edit textarea { flex: 1; min-height: 54px; resize: vertical; }
+.quote-edit .icon-btn { margin-top: 6px; }
+@media (max-width: 700px) {
+  .event-row { grid-template-columns: 1fr auto; }
+  .event-reason { grid-column: 1 / -1; }
+}

@@ -112,6 +112,12 @@ func initDB() error {
 		db = nil
 		return err
 	}
+
+	if err := SeedBlockQuotes(); err != nil {
+		db.Close()
+		db = nil
+		return err
+	}
 	return nil
 }
 
@@ -172,6 +178,33 @@ func createSchema() error {
 
 	CREATE INDEX IF NOT EXISTS idx_sessions_date ON sessions(date);
 	CREATE INDEX IF NOT EXISTS idx_sessions_start ON sessions(start_time);
+
+	CREATE TABLE IF NOT EXISTS block_quotes (
+		id INTEGER PRIMARY KEY AUTOINCREMENT,
+		text TEXT NOT NULL,
+		created_at INTEGER NOT NULL
+	);
+
+	CREATE TABLE IF NOT EXISTS block_events (
+		id INTEGER PRIMARY KEY AUTOINCREMENT,
+		ts INTEGER NOT NULL,
+		date TEXT NOT NULL,
+		kind TEXT NOT NULL,
+		target TEXT NOT NULL,
+		action TEXT NOT NULL,
+		limit_minutes INTEGER DEFAULT 0,
+		used_seconds INTEGER DEFAULT 0,
+		reason TEXT DEFAULT ''
+	);
+
+	CREATE TABLE IF NOT EXISTS block_bypasses (
+		kind TEXT NOT NULL,
+		target TEXT NOT NULL,
+		until_ts INTEGER NOT NULL,
+		reason TEXT NOT NULL,
+		created_at INTEGER NOT NULL,
+		PRIMARY KEY (kind, target)
+	);
 
 	`
 

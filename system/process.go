@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"strings"
 	"syscall"
+	"time"
 	"unsafe"
 )
 
@@ -34,6 +35,7 @@ var (
 	procProcess32NextW      = kernel32.NewProc("Process32NextW")
 	procTerminateProcess    = kernel32.NewProc("TerminateProcess")
 	procQueryFullProcessImg = kernel32.NewProc("QueryFullProcessImageNameW")
+	procGetProcessTimes     = kernel32.NewProc("GetProcessTimes")
 )
 
 const (
@@ -272,4 +274,56 @@ func CountInstancesInDir(name, dir string) int {
 		return true
 	})
 	return count
+}
+
+// ProcessRunning reports whether a pid still names a live process. It uses a
+// query-limited handle, so elevated processes may be reported as gone.
+func ProcessRunning(pid uint32) bool {
+	if pid == 0 {
+		return false
+	}
+	handle, _, _ := procOpenProcess.Call(processQueryLimitedInformation, 0, uintptr(pid))
+	if handle == 0 {
+		return false
+	}
+	procCloseHandle.Call(handle)
+	return true
+}
+
+type filetime struct {
+	low  uint32
+	high uint32
+}
+
+// ProcessAge reports how long a process has been running. A zero value means
+// the age could not be read (for example an elevated process).
+func ProcessAge(pid uint32) time.Duration {
+	if pid == 0 {
+		return 0
+	}
+	handle, _, _ := procOpenProcess.Call(processQueryLimitedInformation, 0, uintptr(pid))
+	if handle == 0 {
+		return 0
+	}
+	defer procCloseHandle.Call(handle)
+	var creation, exit, kernel, user filetime
+	ret, _, _ := procGetProcessTimes.Call(handle,
+		uintptr(unsafe.Pointer(&creation)),
+		uintptr(unsafe.Pointer(&exit)),
+		uintptr(unsafe.Pointer(&kernel)),
+		uintptr(unsafe.Pointer(&user)))
+	if ret == 0 {
+		return 0
+	}
+	ticks := uint64(creation.high)<<32 | uint64(creation.low)
+	const epochDiff = 116444736000000000 // 1601-01-01 to 1970-01-01 in 100ns
+	if ticks <= epochDiff {
+		return 0
+	}
+	created := time.Unix(0, int64(ticks-epochDiff)*100)
+	age := time.Since(created)
+	if age < 0 {
+		return 0
+	}
+	return age
 }

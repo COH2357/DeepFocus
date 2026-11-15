@@ -55,6 +55,9 @@ type actionRequest struct {
 	Format            string `json:"format"`
 	Confirm           string `json:"confirm"`
 	Minutes           int    `json:"minutes"`
+	Text              string `json:"text"`
+	ID                int64  `json:"id"`
+	Language          string `json:"language"`
 	Days              int    `json:"days"`
 	Enabled           *bool  `json:"enabled"`
 	ThresholdMinutes  *int   `json:"thresholdMinutes"`
@@ -160,14 +163,28 @@ func (a *app) limits(w http.ResponseWriter, r *http.Request) error {
 	if err != nil {
 		return err
 	}
+	events, _ := storage.ListBlockEvents(30)
+	blocked, bypassed := storage.BlockStatsToday()
 	return writeJSON(w, map[string]interface{}{
-		"limits":      entries,
-		"suggestions": limitSuggestions(),
+		"limits":        entries,
+		"suggestions":   limitSuggestions(),
+		"sites":         buildSiteLimitEntries(),
+		"events":        events,
+		"blockedToday":  blocked,
+		"bypassedToday": bypassed,
 	})
 }
 
 func (a *app) settings(w http.ResponseWriter, r *http.Request) error {
 	return writeJSON(w, a.settingsSnapshot())
+}
+
+func (a *app) quotes(w http.ResponseWriter, r *http.Request) error {
+	quotes, err := storage.ListBlockQuotes()
+	if err != nil {
+		return err
+	}
+	return writeJSON(w, map[string]interface{}{"quotes": quotes})
 }
 
 func (a *app) pomodoro(w http.ResponseWriter, r *http.Request) error {
@@ -308,6 +325,51 @@ func (a *app) runAction(req actionRequest) (actionResponse, error) {
 
 	case "limit-delete":
 		return ok, system.SetAppTimeLimit(strings.TrimSpace(req.Key), 0)
+
+	case "language":
+		return ok, system.SetLanguage(req.Language)
+
+	case "site-limit-set":
+		class, err := coreapi.SiteClassFromInput(req.Key)
+		if err != nil {
+			return ok, badRequest("%s", err.Error())
+		}
+		if req.Minutes < 1 || req.Minutes > 1440 {
+			return ok, badRequest("limit must be between 1 and 1440 minutes")
+		}
+		if err := system.SetSiteTimeLimit(class, req.Minutes); err != nil {
+			return ok, err
+		}
+		ok.Code = class
+		return ok, nil
+
+	case "site-limit-delete":
+		class, err := coreapi.SiteClassFromInput(req.Key)
+		if err != nil {
+			return ok, badRequest("%s", err.Error())
+		}
+		return ok, system.SetSiteTimeLimit(class, 0)
+
+	case "quote-add":
+		if _, err := storage.AddBlockQuote(req.Text); err != nil {
+			return ok, badRequest("%s", err.Error())
+		}
+		return ok, nil
+
+	case "quote-update":
+		if err := storage.UpdateBlockQuote(req.ID, req.Text); err != nil {
+			return ok, badRequest("%s", err.Error())
+		}
+		return ok, nil
+
+	case "quote-delete":
+		if err := storage.DeleteBlockQuote(req.ID); err != nil {
+			if errors.Is(err, storage.ErrLastQuote) {
+				return ok, badRequest("at least one quote is required")
+			}
+			return ok, err
+		}
+		return ok, nil
 
 	case "break-reminder":
 		if req.Enabled == nil {

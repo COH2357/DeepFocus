@@ -60,7 +60,8 @@
     "CLI and terminal UI for the same local database",
     "Per-app time tracking via Win32 syscalls",
     "Browser site grouping across Chrome, Firefox, Edge, Brave and more",
-    "Daily per-app time limits",
+    "Daily app limits with a non-closable reminder",
+    "Website limits grouped by domain",
     "Pomodoro focus timer and break reminders",
     "Optional weekly archive databases",
     "Local SQLite storage - no cloud",
@@ -238,7 +239,7 @@
       <span class="cap__num">03</span>
       <div>
         <h3>Protect</h3>
-        <p>Set a per-executable ceiling in minutes. At 80% the limit row warns, at 95% it turns red and a Windows toast interrupts you, with a Snooze action. Limits reset at local midnight. DeepFocus's own processes, the lock screen and Windows shell surfaces are always excluded; you can exclude any other executable and its rows disappear immediately.</p>
+        <p>Set a per-executable ceiling or add a website/domain. At 80% a local notification tells you how long is left; at 100% an app limit opens a small always-on-top reminder (it never terminates the app, so unsaved work survives) and a website limit switches to DeepFocus's built-in pause page. A temporary bypass needs a written reason and is recorded locally. DeepFocus's own processes, the lock screen and Windows shell surfaces are always excluded.</p>
         <code>deepfocus limit chrome.exe 60</code>
       </div>
     </li>

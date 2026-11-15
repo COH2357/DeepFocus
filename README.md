@@ -46,7 +46,7 @@ Competitor distribution details come from each vendor's own product pages and re
 | Screen time trackers that send your data to the cloud | All data stays in a local SQLite database — no accounts, no telemetry |
 | Trackers that ship a bundled browser or heavy runtime | Two small native Go binaries (~12 MB CLI, ~8 MB daemon); ~9 MB installer |
 | No visibility into browser tab usage | Tracks time per tab via window title, grouped under 74 hard-coded categories |
-| No way to limit distracting apps | Set daily per-app time limits with notifications |
+| No way to limit distracting apps or sites | Daily app limits with a non-closable reminder, plus website limits grouped by domain |
 | Hard to stay focused | Built-in Pomodoro timer with break reminders |
 
 ---
@@ -100,13 +100,21 @@ The **Settings → Experimental → Group sites by domain** switch is a best-eff
 `chrome`, `firefox`, `msedge`, `brave`, `opera`, `vivaldi`, `waterfox`, `arc`, `iexplore`, `safari`, `whale`, `yandex`, `thorium`, `librewolf`, `chromium`, `floorp`, `zen`. Add others with `deepfocus browser add <name>.exe`.
 
 ### Pomodoro timer
-File-backed timer at `%APPDATA%\focusd\pomodoro.json` so state survives across processes. Default 25 minutes; configurable. Completion is announced through a Windows Toast (`Windows.UI.Notifications.ToastNotification`, invoked from `core/notifications.go` via a short PowerShell command). A 10-second cooldown suppresses duplicate toasts.
+File-backed timer at `%APPDATA%\focusd\pomodoro.json` so state survives across processes. Default 25 minutes; configurable. Completion is announced through a Windows Toast (`Windows.UI.Notifications.ToastNotification`, invoked from `core/notifications.go` via a short PowerShell command). A 10-second cooldown suppresses duplicate toasts. Toast titles, messages and action buttons follow the language selected in the desktop app (or the Windows UI language when set to automatic).
 
 ### Break reminders
 When enabled, the daemon notifies after a configurable number of minutes of continuous use (default 60). The reminder can be snoozed for the global snooze duration (default 60 min).
 
-### Daily app time limits
-Set per-executable limits (`deepfocus limit chrome.exe 60`). The daemon notifies once when the day's usage exceeds the limit; the snooze button suppresses repeats for the snooze window. Limits reset at local midnight.
+### App and website limits
+
+Set per-executable limits (`deepfocus limit chrome.exe 60`) or add a website/domain in **Limits → Website limits**. A URL such as `https://www.bilibili.com/video/...` is reduced to the same `bilibili` class, so its subdomains, player pages and the home page share one allowance. Limits reset at local midnight.
+
+At **80% used** the daemon sends a local notification with the time remaining. At **100%**:
+
+- an app limit opens a small, always-on-top reminder. It never closes or minimizes the app, so unsaved work is safe. The popup cannot be minimized or closed with the native window controls; use **temporarily bypass** (reason required) or the **already closed** button, which only enables after the process has actually exited.
+- a website limit sends a notification, then switches to the full built-in pause page and minimizes the browser. The pause page uses the same visual language as DeepFocus and cannot be closed without bypassing.
+
+Each bypass stores the reason locally, grants 10 minutes, and adds a higher-severity row to **Limits → Limit breaks**. Reasons are for the audit trail only; they do not decide whether the bypass is granted. Quotes on the pause page are editable in **Settings → Blocker quotes**; at least one is required.
 
 ### Whitelist and built-in exclusions
 Whitelisted executables are skipped entirely by the tracker (never recorded). DeepFocus also excludes its own binaries (`deepfocus.exe`, `deepfocus_gui.exe`, `deepfocus_daemon.exe`, plus the legacy `focusd*.exe` names) and Windows shell/lock surfaces such as `LockApp.exe`, `LogonUI.exe`, `ShellExperienceHost.exe`, `StartMenuExperienceHost.exe`, `SearchHost.exe`, `TextInputHost.exe` and `ApplicationFrameHost.exe`. These rows are filtered out of the dashboard, stats and session lists as well, so they disappear immediately rather than lingering until retention.

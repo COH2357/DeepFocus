@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="focusd-token" content="__FOCUSD_TOKEN__">
+<title>DeepFocus · 停一下</title>
+<link rel="icon" href="/favicon.ico">
+<link rel="stylesheet" href="/assets/block.css">
+</head>
+<body>
+<div class="bg-grid"></div>
+<div class="drag-handle" id="dragHandle" title="拖动窗口"><span></span><span></span><span></span></div>
+<header class="chrome">
+  <div class="brand">
+    <span class="brand-mark"><i></i></span>
+    <span class="brand-word">deepfocus.</span>
+  </div>
+  <div class="chrome-meta"><span class="live"></span> 本地限制 · 数据不离开这台电脑</div>
+</header>
+
+<main class="wrap">
+  <section class="left">
+    <div class="eyebrow" id="kindLabel">应用限制</div>
+    <h1>停一下。</h1>
+    <p class="target" id="targetLabel">—</p>
+
+    <div class="usage">
+      <div class="usage-top">
+        <span>今天已经使用</span>
+        <b id="usageText">—</b>
+      </div>
+      <div class="progress"><i id="usageBar"></i></div>
+      <div class="usage-foot">
+        <span id="limitText">—</span>
+        <span id="overText">—</span>
+      </div>
+    </div>
+
+    <blockquote class="quote" id="quote">—</blockquote>
+    <div class="quote-foot">
+      <span id="quoteIndex">语录 1 / 1</span>
+      <button class="text-btn" id="nextQuote" type="button">换一句 →</button>
+    </div>
+  </section>
+
+  <section class="right">
+    <div class="card">
+      <div class="card-kicker">DEEPFOCUS GUARD</div>
+      <h2>把注意力<br>还给自己。</h2>
+      <p class="card-copy" id="cardCopy">这个限制是你自己设的。现在离开，不用向任何人解释。</p>
+      <button class="btn btn-ink" id="leaveBtn" type="button">先不看了，返回工作</button>
+      <button class="btn btn-outline" id="bypassBtn" type="button">我有理由，临时放行</button>
+      <p class="fine">临时放行 <b id="bypassMinutes">10</b> 分钟；放行理由只用于记录，不会替你决定。</p>
+    </div>
+    <div class="audit">
+      <span class="audit-dot"></span>
+      <span id="auditText">突破限制会被记录在本地统计中。</span>
+    </div>
+  </section>
+</main>
+
+<div class="modal-backdrop" id="modal" hidden>
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+    <div class="modal-head">
+      <span class="modal-kicker">临时放行</span>
+      <h2 id="modalTitle">为什么现在需要它？</h2>
+      <p>写一个理由，给自己留一份记录。理由不会阻止你放行。</p>
+    </div>
+    <textarea id="reason" rows="4" maxlength="500" placeholder="例如：需要查一个工作资料，大约 5 分钟。"></textarea>
+    <div class="modal-foot">
+      <span class="field-hint" id="reasonHint">至少写几个字，便于以后回看。</span>
+      <div class="modal-actions">
+        <button class="btn btn-ghost" id="cancelBypass" type="button">取消</button>
+        <button class="btn btn-danger" id="confirmBypass" type="button" disabled>确认放行</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast" hidden></div>
+<script src="/assets/block.js"></script>
+</body>
+</html>

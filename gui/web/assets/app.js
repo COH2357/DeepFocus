@@ -198,7 +198,8 @@
     timer: '<circle cx="12" cy="13" r="8"/><path d="M12 9v4l2.5 2M9 2h6" stroke-linecap="round"/>',
     lock: '<rect x="4.5" y="10" width="15" height="10" rx="2"/><path d="M8 10V7.5a4 4 0 0 1 8 0V10"/>',
     info: '<circle cx="12" cy="12" r="8.5"/><path d="M12 11v5" stroke-linecap="round"/><circle cx="12" cy="8" r="1" fill="currentColor" stroke="none"/>',
-    chart: '<path d="M4 19V5m0 14h16M8 16v-4m4 4V8m4 8v-6" stroke-linecap="round"/>'
+    chart: '<path d="M4 19V5m0 14h16M8 16v-4m4 4V8m4 8v-6" stroke-linecap="round"/>',
+    message: '<path d="M4 5.5h16v11H9l-5 4v-15Z" stroke-linejoin="round"/>'
   };
 
   function icon(name, cls) {
@@ -335,6 +336,11 @@
   async function loadEverything(first) {
     const b = await api("/api/bootstrap");
     state.settings = b.settings;
+    try {
+      if (!localStorage.getItem("focusd.lang") && b.settings && (b.settings.language === "zh" || b.settings.language === "en")) {
+        state.lang = b.settings.language;
+      }
+    } catch (_) {}
     state.overview = b.overview;
     state.pomodoro = b.pomodoro;
     state.limitsData = { limits: b.limits || [], suggestions: b.suggestions || [] };
@@ -568,6 +574,7 @@
   function toggleLang() {
     state.lang = state.lang === "zh" ? "en" : "zh";
     try { localStorage.setItem("focusd.lang", state.lang); } catch (_) {}
+    act("language", { language: state.lang }).catch(function () {});
     applyLanguage();
     if (state.settings && state.selectedPreset == null) state.selectedPreset = state.settings.pomodoroMinutes;
     render();
@@ -1019,7 +1026,7 @@
   /* ---------- limits ---------- */
 
   function renderLimits() {
-    const data = state.limitsData || { limits: [] };
+    const data = state.limitsData || { limits: [], sites: [], events: [] };
     const limits = data.limits || [];
     const rows = limits.map(function (lim) {
       const pct = Math.min(100, Math.max(0, lim.percent));
@@ -1038,13 +1045,54 @@
         '<button class="icon-btn" title="' + esc(t("limits.delete")) + '" data-action="delete-limit" data-key="' + esc(lim.key) + '" data-name="' + esc(lim.name) + '">' + icon("trash") + "</button></div>";
     }).join("");
 
+    const sites = data.sites || [];
+    const siteRows = sites.map(function (lim) {
+      const pct = Math.min(100, Math.max(0, lim.percent));
+      const remaining = lim.minutes * 60 - lim.usedSeconds;
+      const foot = remaining <= 0
+        ? t("limits.overBy", { time: fmtDuration(Math.abs(remaining)) })
+        : t("limits.remaining", { time: fmtDuration(remaining) });
+      return '<div class="limit-row ' + esc(lim.status) + '">' +
+        '<span class="app-icon">' + icon("globe") + "</span>" +
+        '<div style="min-width:0"><div class="between" style="gap:8px"><div class="limit-name">' + esc(lim.label) + "</div>" +
+          '<span class="status-pill ' + esc(lim.status) + '">' + esc(t("limits.status" + cap(lim.status))) + "</span></div>" +
+          '<div class="limit-meta">' + esc(fmtDuration(lim.usedSeconds)) + " / " + esc(fmtDuration(lim.minutes * 60)) + " · " + esc(lim.key) + "</div>" +
+          '<div class="limit-progress"><i style="width:' + pct + '%"></i></div>' +
+          '<div class="limit-meta" style="margin-top:5px">' + esc(foot) + "</div></div>" +
+        '<div class="limit-time">' + pct + "%<br><small>" + esc(fmtDuration(lim.minutes * 60)) + "</small></div>" +
+        '<button class="icon-btn" title="' + esc(t("limits.delete")) + '" data-action="delete-site-limit" data-key="' + esc(lim.key) + '" data-name="' + esc(lim.label) + '">' + icon("trash") + "</button></div>";
+    }).join("");
+
+    const events = data.events || [];
+    const eventRows = events.slice(0, 12).map(function (e) {
+      const action = e.action === "bypassed" ? t("limits.eventBypassed") : t("limits.eventBlocked");
+      return '<div class="event-row"><span class="event-time">' + esc(fmtDateShort(e.date)) + " " + esc(fmtTime(e.time)) + "</span>" +
+        '<span class="event-action ' + esc(e.action) + '">' + esc(action) + "</span>" +
+        "<b>" + esc(e.target) + "</b>" +
+        '<span class="event-reason">' + esc(e.reason || e.kind) + "</span></div>";
+    }).join("");
+
+    const siteForm = '<form class="site-limit-form" data-form="site-limit">' +
+      '<input class="input" name="site" placeholder="' + esc(t("limits.sitePlaceholder")) + '" autocomplete="off">' +
+      '<input class="input mono" name="minutes" type="number" min="1" max="1440" step="5" value="30" style="width:86px">' +
+      '<button class="btn btn-sm" type="submit">' + esc(t("limits.addSite")) + "</button></form>";
+
+    const appCard = limits.length
+      ? '<div class="card">' + rows + "</div>"
+      : '<div class="card">' + emptyState("shield", t("limits.empty"), t("limits.emptySub")) +
+        '<div style="text-align:center;margin-top:4px"><button class="btn btn-primary" data-action="open-limit">' + icon("plus") + esc(t("limits.add")) + "</button></div></div>";
+
     return '<div class="page">' +
       pageHead(t("nav.limits"), t("limits.title"), t("limits.subtitle"),
         '<button class="btn btn-primary" data-action="open-limit">' + icon("plus") + esc(t("limits.add")) + "</button>") +
-      (limits.length
-        ? '<div class="card">' + rows + "</div>"
-        : '<div class="card">' + emptyState("shield", t("limits.empty"), t("limits.emptySub")) +
-          '<div style="text-align:center;margin-top:4px"><button class="btn btn-primary" data-action="open-limit">' + icon("plus") + esc(t("limits.add")) + "</button></div></div>") +
+      appCard +
+      '<div class="card site-limits" style="margin-top:16px"><div class="card-head"><div><div class="card-title">' + icon("globe") + esc(t("limits.sitesTitle")) + "</div>" +
+        '<div class="card-sub">' + esc(t("limits.sitesSub")) + "</div></div></div>" +
+        (siteRows || '<div class="chips-empty" style="padding:4px 0 10px">' + esc(t("limits.sitesEmpty")) + "</div>") +
+        siteForm + "</div>" +
+      '<div class="card" style="margin-top:16px"><div class="card-head"><div><div class="card-title">' + icon("alert") + esc(t("limits.eventsTitle")) + "</div>" +
+        '<div class="card-sub">' + esc(t("limits.eventsSub", { n: data.blockedToday || 0, m: data.bypassedToday || 0 })) + "</div></div></div>" +
+        (eventRows || '<div class="chips-empty" style="padding:4px 0">' + esc(t("limits.eventsEmpty")) + "</div>") + "</div>" +
       '<div class="card" style="margin-top:16px;display:flex;gap:12px;align-items:flex-start">' +
         '<span class="kpi-icon" style="flex:none">' + icon("info") + "</span><div><b style=\"font-size:12.5px\">" + esc(t("limits.addTitle")) + "</b>" +
         '<p class="muted" style="margin:4px 0 0;font-size:12px">' + esc(t("limits.note")) + "</p></div></div>" +
@@ -1212,6 +1260,10 @@
         : "") +
       "</div>";
 
+    const quotes = '<div class="card"><div class="card-head"><div><div class="card-title">' + icon("message") + esc(t("settings.quotes")) + "</div>" +
+      '<div class="card-sub">' + esc(t("settings.quotesDesc", { n: s.quoteCount || 0 })) + "</div></div></div>" +
+      '<button class="btn btn-sm" data-action="quotes">' + esc(t("settings.manageQuotes")) + "</button></div>";
+
     const dataCard = '<div class="card"><div class="card-head"><div class="card-title">' + icon("download") + esc(t("settings.data")) + "</div></div>" +
       '<div class="setting-row"><div class="setting-text"><b>' + esc(t("settings.export")) + "</b><span>" + esc(t("settings.exportDesc")) + "</span></div>" +
         '<div class="setting-control"><button class="btn btn-sm" data-action="export" data-format="csv">' + esc(t("settings.exportCsv")) + "</button>" +
@@ -1236,7 +1288,7 @@
 
     return '<div class="page">' +
       pageHead(t("nav.settings"), t("settings.title"), t("settings.subtitle")) +
-      '<div class="settings-grid">' + tracking + idleCard + experimental + archive + breaks + privacy + dataCard + about + '<div class="full">' + danger + "</div></div></div>";
+      '<div class="settings-grid">' + tracking + idleCard + experimental + archive + quotes + breaks + privacy + dataCard + about + '<div class="full">' + danger + "</div></div></div>";
   }
 
   function retentionOptions(current) {
@@ -1274,6 +1326,77 @@
               toast(t("settings.wipeDone"));
               await loadEverything(false);
               render();
+            } catch (err) {
+              toastError(err);
+              this.disabled = false;
+            }
+          });
+        }
+      }
+    );
+  }
+
+  function quoteEditRow(id, text) {
+    return '<div class="quote-edit" data-id="' + esc(id || "") + '">' +
+      '<textarea class="input" rows="2" maxlength="240">' + esc(text || "") + "</textarea>" +
+      '<button type="button" class="icon-btn" data-remove-quote title="' + esc(t("settings.quoteDelete")) + '">' + icon("trash") + "</button></div>";
+  }
+
+  async function openQuotesModal() {
+    let data;
+    try {
+      data = await api("/api/quotes");
+    } catch (err) {
+      toastError(err);
+      return;
+    }
+    const list = data.quotes || [];
+    const body = '<div class="quote-edit-list">' + list.map(function (q) { return quoteEditRow(q.id, q.text); }).join("") + "</div>" +
+      '<button type="button" class="btn btn-sm" id="addQuote" style="margin-top:10px">' + icon("plus") + " " + esc(t("settings.quoteAdd")) + "</button>";
+    openModal(
+      '<div class="modal-head"><h3>' + esc(t("settings.quotesTitle")) + "</h3><p>" + esc(t("settings.quotesSub")) + "</p></div>" +
+      '<div class="modal-body">' + body + "</div>" +
+      '<div class="modal-foot"><button class="btn" data-close>' + esc(t("common.cancel")) + "</button>" +
+        '<button class="btn btn-primary" id="saveQuotes">' + esc(t("common.save")) + "</button></div>",
+      {
+        onMount: function (modal) {
+          const listEl = $(".quote-edit-list", modal);
+          $("[data-close]", modal).addEventListener("click", closeModal);
+          $("#addQuote", modal).addEventListener("click", function () {
+            listEl.insertAdjacentHTML("beforeend", quoteEditRow("", ""));
+            const ta = listEl.lastElementChild.querySelector("textarea");
+            if (ta) ta.focus();
+          });
+          listEl.addEventListener("click", async function (event) {
+            const btn = event.target.closest("[data-remove-quote]");
+            if (!btn) return;
+            const row = btn.closest(".quote-edit");
+            const id = parseInt(row.dataset.id, 10);
+            if (!id) { row.remove(); return; }
+            if (listEl.querySelectorAll(".quote-edit").length <= 1) return toast(t("settings.quoteLast"), "err");
+            try {
+              await act("quote-delete", { id: id });
+              row.remove();
+            } catch (err) {
+              toastError(err);
+            }
+          });
+          $("#saveQuotes", modal).addEventListener("click", async function () {
+            const rows = $$(".quote-edit", listEl);
+            if (!rows.length) return toast(t("settings.quoteLast"), "err");
+            this.disabled = true;
+            try {
+              for (const row of rows) {
+                const text = $("textarea", row).value.trim();
+                if (!text) continue;
+                const id = parseInt(row.dataset.id, 10);
+                if (id) await act("quote-update", { id: id, text: text });
+                else await act("quote-add", { text: text });
+              }
+              closeModal();
+              await loadSettings();
+              render();
+              toast(t("settings.saved"));
             } catch (err) {
               toastError(err);
               this.disabled = false;
@@ -1374,6 +1497,17 @@
         break;
       case "delete-limit":
         deleteLimit(node.dataset.key, node.dataset.name);
+        break;
+      case "delete-site-limit":
+        confirmModal(t("limits.deleteTitle"), esc(t("limits.deleteBody", { name: node.dataset.name })), t("limits.removeConfirm"), true, async function () {
+          await act("site-limit-delete", { key: node.dataset.key });
+          toast(t("limits.removedToast"));
+          await loadLimits();
+          render();
+        });
+        break;
+      case "quotes":
+        openQuotesModal();
         break;
       case "preset":
         state.selectedPreset = parseInt(node.dataset.minutes, 10) || 25;
@@ -1680,6 +1814,22 @@
       }
       state.loading = false;
       render();
+      return;
+    }
+    if (kind === "site-limit") {
+      const site = form.elements.site.value.trim();
+      const minutes = parseInt(form.elements.minutes.value, 10);
+      if (!site) return toast(t("limits.sitePlaceholder"), "err");
+      if (!minutes || minutes < 1 || minutes > 1440) return toast(t("limits.minutesInvalid"), "err");
+      try {
+        await act("site-limit-set", { key: site, minutes: minutes });
+        form.reset();
+        toast(t("limits.addedToast"));
+        await loadLimits();
+        render();
+      } catch (err) {
+        toastError(err);
+      }
       return;
     }
     const input = form.elements.value;

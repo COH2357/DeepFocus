@@ -192,7 +192,15 @@ if ($global:focusdChoice -ne '') { $global:focusdChoice } else { 'timeout' }
 
 const toastXMLTemplate = `<toast><visual><binding template="ToastGeneric"><text id="1"></text><text id="2"></text></binding></visual></toast>`
 
-const actionToastXMLTemplate = `<toast><visual><binding template="ToastGeneric"><text id="1"></text><text id="2"></text></binding></visual><actions><action content="Disable this reminder" arguments="disable" activationType="background"/><action content="Just close" arguments="close" activationType="background"/></actions></toast>`
+func actionToastXML() string {
+	disable, closeLabel := "Disable this reminder", "Just close"
+	if system.UseChinese() {
+		disable, closeLabel = "关闭此类提醒", "暂时关闭"
+	}
+	return `<toast><visual><binding template="ToastGeneric"><text id="1"></text><text id="2"></text></binding></visual><actions><action content="` +
+		disable + `" arguments="disable" activationType="background"/><action content="` + closeLabel +
+		`" arguments="close" activationType="background"/></actions></toast>`
+}
 
 // toastEnv passes values raw. The script assigns title and message through
 // InnerText, which escapes on its own, and LoadXml requires the template to be
@@ -231,7 +239,7 @@ func showNotificationWithAction(ctx context.Context, title, message string, call
 	t := truncateRunes(title, 200)
 	m := truncateRunes(message, 200)
 
-	tp := startToast(ctx, actionToastScript, toastEnv(t, m, actionToastXMLTemplate))
+	tp := startToast(ctx, actionToastScript, toastEnv(t, m, actionToastXML()))
 	if !tp.started {
 		return false
 	}
