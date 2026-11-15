@@ -44,7 +44,7 @@ func (a *app) blockInfo(w http.ResponseWriter, r *http.Request) error {
 		BypassMinutes:  blockBypassMinutes,
 		Quote:          quote,
 		QuoteCount:     len(quotes),
-		ProcessRunning: system.ProcessRunning(a.block.PID),
+		ProcessRunning: system.TargetAlive(a.block.HWND, a.block.PID),
 		Mode:           a.block.Kind,
 		Quotes:         texts,
 	})

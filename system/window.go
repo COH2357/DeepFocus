@@ -21,6 +21,7 @@ var (
 	procShowWindow               = user32.NewProc("ShowWindow")
 	procSetForegroundWindow      = user32.NewProc("SetForegroundWindow")
 	procKeybdEvent               = user32.NewProc("keybd_event")
+	procIsWindow                 = user32.NewProc("IsWindow")
 )
 
 const (
@@ -160,4 +161,32 @@ func CloseActiveTab(hwnd uintptr) {
 	procKeybdEvent.Call('W', 0, 0, 0)
 	procKeybdEvent.Call('W', 0, keyUp, 0)
 	procKeybdEvent.Call(vkControl, 0, keyUp, 0)
+}
+
+// WindowExists reports whether a top-level window handle is still alive.
+func WindowExists(hwnd uintptr) bool {
+	if hwnd == 0 {
+		return false
+	}
+	ret, _, _ := procIsWindow.Call(hwnd)
+	return ret != 0
+}
+
+// TargetAlive reports whether the app or browser window that triggered a
+// blocker still exists. Browsers such as Edge keep background processes alive
+// after their last window closes, so PID liveness alone would leave the
+// reminder's "already closed" button disabled forever.
+func TargetAlive(hwnd uintptr, pid uint32) bool {
+	if hwnd != 0 {
+		if !WindowExists(hwnd) {
+			return false
+		}
+		var owner uint32
+		procGetWindowThreadProcessId.Call(hwnd, uintptr(unsafe.Pointer(&owner)))
+		if owner != 0 && pid != 0 && owner != pid {
+			return false
+		}
+		return true
+	}
+	return ProcessRunning(pid)
 }

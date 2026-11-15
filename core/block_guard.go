@@ -138,7 +138,7 @@ func (g *blockGuard) enforceAppLocked(fg *system.WindowInfo) {
 	}
 	// The popup stays while the app is running. If it was closed by the user,
 	// bring it back after a short backoff.
-	if system.ProcessRunning(g.active.pid) {
+	if system.TargetAlive(g.active.hwnd, g.active.pid) {
 		if g.active.cmd == nil || !system.ProcessRunning(uint32(g.active.cmd.Process.Pid)) {
 			if time.Now().After(g.nextSpawn) {
 				if err := g.spawn(g.active.kind, g.active.target, g.active.label, g.active.limit, g.active.used, g.active.hwnd, g.active.pid); err != nil {
