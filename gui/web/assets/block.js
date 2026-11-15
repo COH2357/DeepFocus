@@ -90,6 +90,25 @@
     }
   }
 
+
+  let processTimer = null;
+  async function refreshProcess() {
+    if (!state.info || state.info.mode !== "app") return;
+    try {
+      const info = await api("/api/block/info");
+      state.info.processRunning = info.processRunning;
+      const btn = $("#leaveBtn");
+      btn.disabled = !!info.processRunning;
+      btn.textContent = info.processRunning
+        ? "已经关闭 " + (state.info.label || state.info.target)
+        : "关闭提醒，返回工作";
+    } catch (_) {}
+  }
+  function startProcessPolling() {
+    clearInterval(processTimer);
+    processTimer = setInterval(refreshProcess, 2000);
+  }
+
   $("#nextQuote").addEventListener("click", nextQuote);
 
   const dragHandle = $("#dragHandle");
