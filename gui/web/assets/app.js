@@ -998,7 +998,7 @@
       '<div class="card-sub">' + esc(t("focus.breakDesc")) + "</div></div>" +
       switchHTML(settings.breakReminder.enabled, "break-enabled") + "</div>" +
       '<div class="setting-row"><div class="setting-text"><b>' + esc(t("focus.breakEvery")) + "</b></div>" +
-      '<div class="setting-control"><input class="input mono" type="number" min="1" max="600" step="5" data-setting="break-minutes" value="' +
+      '<div class="setting-control"><input class="input mono" type="number" min="1" max="600" step="1" data-setting="break-minutes" value="' +
       settings.breakReminder.minutes + '" style="width:84px"><span class="faint" style="font-size:11px">' + esc(t("settings.minutes")) + "</span></div></div></div>";
 
     const defaultCard = '<div class="card"><div class="card-head"><div class="card-title">' + icon("timer") + esc(t("focus.default")) + "</div></div>" +
@@ -1074,7 +1074,7 @@
 
     const siteForm = '<form class="site-limit-form" data-form="site-limit">' +
       '<input class="input" name="site" placeholder="' + esc(t("limits.sitePlaceholder")) + '" autocomplete="off">' +
-      '<input class="input mono" name="minutes" type="number" min="1" max="1440" step="5" value="30" style="width:86px">' +
+      '<input class="input mono" name="minutes" type="number" min="1" max="1440" step="1" value="30" style="width:86px">' +
       '<button class="btn btn-sm" type="submit">' + esc(t("limits.addSite")) + "</button></form>";
 
     const appCard = limits.length
@@ -1124,7 +1124,7 @@
           '<input class="input" id="limitKey" name="key" autocomplete="off" placeholder="steam.exe" value="' + esc(preset.key || "") + '">' +
           '<span class="hint">' + esc(t("limits.customHint")) + "</span></div>" +
         '<div class="field"><label for="limitMinutes">' + esc(t("limits.minutesLabel")) + "</label>" +
-          '<input class="input mono" id="limitMinutes" name="minutes" type="number" min="1" max="1440" step="5" value="60"></div>' +
+          '<input class="input mono" id="limitMinutes" name="minutes" type="number" min="1" max="1440" step="1" value="60"></div>' +
         '<div class="chips-empty" data-selected-name style="padding:0;color:var(--accent)">' +
           (preset.name ? esc(preset.name) : "") + "</div>" +
       "</div>" +
@@ -1234,7 +1234,7 @@
       '<div class="setting-row"><div class="setting-text"><b>' + esc(t("settings.breakReminder")) + "</b><span>" + esc(t("focus.breakDesc")) + "</span></div>" +
         '<div class="setting-control">' + switchHTML(s.breakReminder.enabled, "break-enabled") + "</div></div>" +
       '<div class="setting-row"><div class="setting-text"><b>' + esc(t("settings.breakEvery")) + "</b></div>" +
-        '<div class="setting-control"><input class="input mono" type="number" min="1" max="600" step="5" value="' + s.breakReminder.minutes + '" data-setting="break-minutes" style="width:86px"><span class="faint" style="font-size:11px">' + esc(t("settings.minutes")) + "</span></div></div>" +
+        '<div class="setting-control"><input class="input mono" type="number" min="1" max="600" step="1" value="' + s.breakReminder.minutes + '" data-setting="break-minutes" style="width:86px"><span class="faint" style="font-size:11px">' + esc(t("settings.minutes")) + "</span></div></div>" +
       '<div class="setting-row"><div class="setting-text"><b>' + esc(t("settings.pomodoroDefault")) + "</b></div>" +
         '<div class="setting-control"><select class="select" data-setting="pomodoro-minutes">' + pomodoroOptions(s.pomodoroMinutes) + "</select></div></div></div>";
 
