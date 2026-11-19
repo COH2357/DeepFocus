@@ -122,6 +122,12 @@ func (g *blockGuard) enforce() {
 	if !ok {
 		return
 	}
+	// A bypass is checked here as well as on the active-block path. Otherwise
+	// closing the blocker for a bypass clears active, and the very next tick
+	// reopens it while the target is still in front: the open/close loop.
+	if storage.ActiveBlockBypass(v.kind, v.target, time.Now()) {
+		return
+	}
 	if v.kind == "site" {
 		g.startSiteLocked(v)
 		return
@@ -181,6 +187,9 @@ func (g *blockGuard) startAppLocked(v violation) {
 	if time.Now().Before(g.nextSpawn) {
 		return
 	}
+	if storage.ActiveBlockBypass(v.kind, v.target, time.Now()) {
+		return
+	}
 	if !storage.HasBlockEventToday(v.kind, v.label) {
 		_ = storage.RecordBlockEvent(v.kind, v.label, "blocked", v.limit, v.used, "")
 	}
@@ -197,6 +206,9 @@ func (g *blockGuard) startAppLocked(v violation) {
 
 func (g *blockGuard) startSiteLocked(v violation) {
 	if time.Now().Before(g.nextSpawn) {
+		return
+	}
+	if storage.ActiveBlockBypass(v.kind, v.target, time.Now()) {
 		return
 	}
 	key := "site:" + v.target
