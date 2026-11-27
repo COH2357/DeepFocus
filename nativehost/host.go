@@ -199,14 +199,16 @@ func decide(req request) response {
 		// website-limit list. Everything else is ordinary browsing.
 		return response{OK: true, Action: "allow"}
 	}
-	if system.GetStrongWebMode() {
-		return response{OK: true, Action: "block", Site: site, Label: coreapi.SiteClassDisplay(site), Reason: "strong", LimitMinute: limit}
-	}
 	used := coreapi.SiteUsageTodaySeconds(site)
-	if used >= limit*60 {
-		return response{OK: true, Action: "block", Site: site, Label: coreapi.SiteClassDisplay(site), Reason: "limit", UsedSeconds: used, LimitMinute: limit}
+	if used < limit*60 {
+		// Never interrupt a site before its daily allowance is actually used up.
+		return response{OK: true, Action: "allow", Site: site, Label: coreapi.SiteClassDisplay(site), UsedSeconds: used, LimitMinute: limit}
 	}
-	return response{OK: true, Action: "allow"}
+	reason := "limit"
+	if system.GetStrongWebMode() {
+		reason = "strong"
+	}
+	return response{OK: true, Action: "block", Site: site, Label: coreapi.SiteClassDisplay(site), Reason: reason, UsedSeconds: used, LimitMinute: limit}
 }
 
 func isAllowlisted(host, site string) bool {

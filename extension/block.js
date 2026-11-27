@@ -40,8 +40,8 @@
     $("lede").textContent = "这个网站今天的额度已经用完。说明用途后可以临时放行，记录会保存在本地。";
     $("kicker").textContent = "网站额度已到";
   } else if (reason === "strong") {
-    $("lede").textContent = "强力监管已开启。访问这个网站前，请说明用途并选择放行时长。";
-    $("kicker").textContent = "强力监管";
+    $("lede").textContent = "这个网站今天的额度已经用完。强力监管要求说明用途并选择放行时长。";
+    $("kicker").textContent = "额度已用完";
   }
 
   let selected = 15;
