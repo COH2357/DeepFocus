@@ -54,7 +54,6 @@ jobs:
           go build -ldflags="-s -w -X 'focusd/system.Version=${{ env.VERSION }}'" -trimpath -o deepfocus.exe ./cmd/deepfocus
           go build -ldflags="-s -w -H=windowsgui -X 'focusd/system.Version=${{ env.VERSION }}'" -trimpath -o deepfocus_gui.exe ./cmd/deepfocus_gui
           go build -ldflags="-s -w -H=windowsgui -X 'focusd/system.Version=${{ env.VERSION }}'" -trimpath -o deepfocus_daemon.exe ./cmd/deepfocus_daemon
-          go build -ldflags="-s -w -H=windowsgui -X 'focusd/system.Version=${{ env.VERSION }}'" -trimpath -o deepfocus_native.exe ./cmd/deepfocus_native
 
       - name: Build NSIS Installer
         run: |
@@ -65,8 +64,7 @@ jobs:
         run: |
           $stage = Join-Path $env:RUNNER_TEMP "deepfocus-portable"
           New-Item -ItemType Directory -Force -Path $stage | Out-Null
-          Copy-Item deepfocus.exe, deepfocus_gui.exe, deepfocus_daemon.exe, deepfocus_native.exe $stage
-          Copy-Item -Recurse extension (Join-Path $stage "extension")
+          Copy-Item deepfocus.exe, deepfocus_gui.exe, deepfocus_daemon.exe $stage
           $zip = "deepfocus-v${{ env.VERSION }}-windows-amd64.zip"
           Compress-Archive -Path (Join-Path $stage "*") -DestinationPath $zip
           Remove-Item -Recurse -Force $stage
