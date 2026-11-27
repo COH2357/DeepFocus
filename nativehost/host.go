@@ -192,16 +192,19 @@ func decide(req request) response {
 	if _, ok := storage.SiteAllowanceUntil(site, now); ok {
 		return response{OK: true, Action: "allow"}
 	}
-	if system.GetStrongWebMode() {
-		return response{OK: true, Action: "block", Site: site, Label: coreapi.SiteClassDisplay(site), Reason: "strong"}
-	}
 	limits := system.GetSiteTimeLimits()
-	if limit, ok := limits[site]; ok && limit > 0 {
-		used := coreapi.SiteUsageTodaySeconds(site)
-		if used >= limit*60 {
-			return response{OK: true, Action: "block", Site: site, Label: coreapi.SiteClassDisplay(site), Reason: "limit", UsedSeconds: used, LimitMinute: limit}
-		}
+	limit, limited := limits[site]
+	if !limited || limit <= 0 {
+		// Strong mode only governs sites the user explicitly added to the
+		// website-limit list. Everything else is ordinary browsing.
 		return response{OK: true, Action: "allow"}
+	}
+	if system.GetStrongWebMode() {
+		return response{OK: true, Action: "block", Site: site, Label: coreapi.SiteClassDisplay(site), Reason: "strong", LimitMinute: limit}
+	}
+	used := coreapi.SiteUsageTodaySeconds(site)
+	if used >= limit*60 {
+		return response{OK: true, Action: "block", Site: site, Label: coreapi.SiteClassDisplay(site), Reason: "limit", UsedSeconds: used, LimitMinute: limit}
 	}
 	return response{OK: true, Action: "allow"}
 }
