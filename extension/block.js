@@ -47,6 +47,7 @@
   let selected = 15;
   const reasonEl = $("reason");
   const grant = $("grant");
+  const custom = $("customMinutes");
   const refresh = () => {
     grant.disabled = reasonEl.value.trim().length < 2;
   };
@@ -55,8 +56,16 @@
   document.querySelectorAll("[data-minutes]").forEach((button) => {
     button.addEventListener("click", () => {
       selected = Number(button.dataset.minutes) || 15;
+      custom.value = "";
       document.querySelectorAll("[data-minutes]").forEach((b) => b.classList.toggle("active", b === button));
     });
+  });
+  custom.addEventListener("input", () => {
+    const minutes = parseInt(custom.value, 10);
+    if (minutes >= 1 && minutes <= 1440) {
+      selected = minutes;
+      document.querySelectorAll("[data-minutes]").forEach((b) => b.classList.remove("active"));
+    }
   });
   refresh();
 
@@ -72,6 +81,10 @@
   grant.addEventListener("click", () => {
     const text = reasonEl.value.trim();
     if (text.length < 2) return;
+    if (selected < 1 || selected > 1440) {
+      toast("放行时长需要在 1–1440 分钟之间", true);
+      return;
+    }
     grant.disabled = true;
     grant.textContent = "正在记录…";
     chrome.runtime.sendMessage({

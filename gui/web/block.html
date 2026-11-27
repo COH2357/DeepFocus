@@ -68,6 +68,13 @@
       <p>写一个理由，给自己留一份记录。理由不会阻止你放行。</p>
     </div>
     <textarea id="reason" rows="4" maxlength="500" placeholder="例如：需要查一个工作资料，大约 5 分钟。"></textarea>
+    <div class="bypass-durations" id="bypassDurations">
+      <button type="button" data-bypass-minutes="5">5 分钟</button>
+      <button type="button" data-bypass-minutes="10" class="active">10 分钟</button>
+      <button type="button" data-bypass-minutes="30">30 分钟</button>
+      <button type="button" data-bypass-minutes="60">60 分钟</button>
+      <input id="customBypassMinutes" type="number" min="1" max="1440" step="1" placeholder="自定义">
+    </div>
     <div class="modal-foot">
       <span class="field-hint" id="reasonHint">至少写几个字，便于以后回看。</span>
       <div class="modal-actions">

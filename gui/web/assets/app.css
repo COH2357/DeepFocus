@@ -1026,3 +1026,5 @@ h1 { overflow-wrap: anywhere; text-wrap: balance; }
 }
 
 .mode-btn.selected{border-color:var(--accent);color:var(--accent);background:color-mix(in srgb,var(--accent) 8%,transparent)}
+
+.custom-focus{display:flex;gap:8px;align-items:center;margin:10px 0 0}.custom-focus input{flex:1;height:36px;min-width:0;font-size:11px}.custom-focus .btn{flex:none;height:36px}

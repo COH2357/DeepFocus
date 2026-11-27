@@ -1,5 +1,8 @@
 const HOST = "com.deepfocus.host";
 const BLOCK_PAGE = chrome.runtime.getURL("block.html");
+const ALLOWANCE_KEY = "deepfocus_allowances";
+const ALLOWANCE_POLL = "deepfocus-allowance-poll";
+const ALLOWANCE_EXPIRY = "deepfocus-allowance-expiry";
 
 const browser = (() => {
   const ua = navigator.userAgent || "";
@@ -21,20 +24,81 @@ function nativeMessage(message) {
   });
 }
 
-function isInternal(url) {
-  return (
-    url.startsWith("chrome-extension://") ||
-    url.startsWith("edge-extension://") ||
-    url.startsWith("about:") ||
-    url.startsWith("chrome:") ||
-    url.startsWith("edge:") ||
-    url.startsWith("devtools:") ||
-    url.startsWith("view-source:")
-  );
+function blockURL(reply, url) {
+  const block = new URL(BLOCK_PAGE);
+  block.searchParams.set("site", reply.site || "");
+  block.searchParams.set("label", reply.label || reply.site || "");
+  block.searchParams.set("reason", reply.reason || "strong");
+  block.searchParams.set("used", String(reply.usedSeconds || 0));
+  block.searchParams.set("limit", String(reply.limitMinutes || 0));
+  block.searchParams.set("url", url);
+  return block.toString();
+}
+
+function redirectToBlock(tabId, reply, url) {
+  chrome.tabs.update(tabId, { url: blockURL(reply, url) }).catch(() => {});
+}
+
+async function loadAllowances() {
+  const data = await chrome.storage.local.get(ALLOWANCE_KEY);
+  return data[ALLOWANCE_KEY] || {};
+}
+
+async function saveAllowances(allowances) {
+  await chrome.storage.local.set({ [ALLOWANCE_KEY]: allowances });
+}
+
+async function rememberAllowance(site, until) {
+  if (!site || !until) return;
+  const allowances = await loadAllowances();
+  allowances[site] = until;
+  await saveAllowances(allowances);
+  await scheduleAllowanceCheck();
+}
+
+async function scheduleAllowanceCheck() {
+  const allowances = await loadAllowances();
+  const now = Math.floor(Date.now() / 1000);
+  const future = Object.values(allowances).filter((until) => Number(until) > now);
+  if (!future.length) {
+    await chrome.alarms.clear(ALLOWANCE_EXPIRY);
+    await chrome.alarms.clear(ALLOWANCE_POLL);
+    return;
+  }
+  const next = Math.min(...future.map(Number));
+  chrome.alarms.create(ALLOWANCE_EXPIRY, { when: Math.max(Date.now() + 1000, next * 1000 + 500) });
+  // A periodic sweep also catches a disabled laptop waking after the deadline.
+  chrome.alarms.create(ALLOWANCE_POLL, { periodInMinutes: 0.5 });
+}
+
+async function checkAllowances() {
+  const allowances = await loadAllowances();
+  const now = Math.floor(Date.now() / 1000);
+  if (!Object.keys(allowances).length) return;
+  const tabs = await chrome.tabs.query({ url: ["http://*/*", "https://*/*"] });
+  for (const tab of tabs) {
+    if (!tab.id || !tab.url) continue;
+    const reply = await nativeMessage({
+      type: "navigation",
+      browser,
+      version: "0.1.2",
+      url: tab.url,
+      tabId: tab.id
+    });
+    if (reply && reply.action === "block") {
+      redirectToBlock(tab.id, reply, tab.url);
+    }
+  }
+  const remaining = {};
+  for (const [site, until] of Object.entries(allowances)) {
+    if (Number(until) > now) remaining[site] = until;
+  }
+  await saveAllowances(remaining);
+  await scheduleAllowanceCheck();
 }
 
 async function heartbeat() {
-  await nativeMessage({ type: "heartbeat", browser, version: "0.1.0" });
+  await nativeMessage({ type: "heartbeat", browser, version: "0.1.2" });
 }
 
 async function guardNavigation(details) {
@@ -46,7 +110,7 @@ async function guardNavigation(details) {
   const reply = await nativeMessage({
     type: "navigation",
     browser,
-    version: "0.1.0",
+    version: "0.1.2",
     url,
     tabId: details.tabId
   });
@@ -58,15 +122,7 @@ async function guardNavigation(details) {
     return;
   }
   if (reply.action !== "block") return;
-
-  const block = new URL(BLOCK_PAGE);
-  block.searchParams.set("site", reply.site || "");
-  block.searchParams.set("label", reply.label || reply.site || "");
-  block.searchParams.set("reason", reply.reason || "strong");
-  block.searchParams.set("used", String(reply.usedSeconds || 0));
-  block.searchParams.set("limit", String(reply.limitMinutes || 0));
-  block.searchParams.set("url", url);
-  chrome.tabs.update(details.tabId, { url: block.toString() }).catch(() => {});
+  redirectToBlock(details.tabId, reply, url);
 }
 
 chrome.webNavigation.onBeforeNavigate.addListener((details) => {
@@ -82,27 +138,36 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   nativeMessage({
     type: "request_access",
     browser,
-    version: "0.1.0",
+    version: "0.1.2",
     site: message.site || "",
     url: message.url || "",
     minutes: Number(message.minutes) || 0,
     reason: message.reason || ""
-  }).then((reply) => sendResponse(reply || { ok: false, error: "DeepFocus 服务未运行" }));
+  }).then((reply) => {
+    if (reply && reply.ok && reply.until) rememberAllowance(reply.site, reply.until).catch(() => {});
+    sendResponse(reply || { ok: false, error: "DeepFocus 服务未运行" });
+  });
   return true;
 });
 
 chrome.runtime.onInstalled.addListener(() => {
   chrome.alarms.create("deepfocus-heartbeat", { periodInMinutes: 1 });
   heartbeat();
+  scheduleAllowanceCheck().catch(() => {});
 });
 
 chrome.runtime.onStartup.addListener(() => {
   chrome.alarms.create("deepfocus-heartbeat", { periodInMinutes: 1 });
   heartbeat();
+  scheduleAllowanceCheck().catch(() => {});
 });
 
 chrome.alarms.onAlarm.addListener((alarm) => {
   if (alarm.name === "deepfocus-heartbeat") heartbeat();
+  if (alarm.name === ALLOWANCE_POLL || alarm.name === ALLOWANCE_EXPIRY) {
+    checkAllowances().catch(() => {});
+  }
 });
 
 heartbeat();
+scheduleAllowanceCheck().catch(() => {});

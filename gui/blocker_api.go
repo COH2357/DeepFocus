@@ -56,7 +56,8 @@ func (a *app) blockInfo(w http.ResponseWriter, r *http.Request) error {
 }
 
 type blockBypassRequest struct {
-	Reason string `json:"reason"`
+	Reason  string `json:"reason"`
+	Minutes int    `json:"minutes"`
 }
 
 func (a *app) blockBypass(w http.ResponseWriter, r *http.Request) error {
@@ -68,10 +69,17 @@ func (a *app) blockBypass(w http.ResponseWriter, r *http.Request) error {
 	if reason == "" {
 		return badRequest("a reason is required")
 	}
+	minutes := req.Minutes
+	if minutes <= 0 {
+		minutes = blockBypassMinutes
+	}
+	if minutes < 1 || minutes > 1440 {
+		return badRequest("allow duration must be between 1 and 1440 minutes")
+	}
 	if len([]rune(reason)) > 500 {
 		reason = string([]rune(reason)[:500])
 	}
-	until := time.Now().Add(blockBypassMinutes * time.Minute)
+	until := time.Now().Add(time.Duration(minutes) * time.Minute)
 	if err := storage.SetBlockBypass(a.block.Kind, a.block.Target, until, reason); err != nil {
 		return err
 	}

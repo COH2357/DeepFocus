@@ -143,6 +143,9 @@
       "focus.noActive": "No session running.",
       "focus.setDefault": "Default length saved",
       "focus.notifyNote": "Completed sessions also trigger a desktop notification.",
+      "focus.customPlaceholder": "Custom minutes",
+      "focus.customStart": "Start custom",
+      "focus.customInvalid": "Enter a custom duration between 1 and 1440 minutes",
       "focus.sessionsToday": "Sessions today",
       "focus.minutesToday": "Focused today",
 
@@ -481,6 +484,9 @@
       "focus.noActive": "当前没有进行中的专注。",
       "focus.setDefault": "默认时长已保存",
       "focus.notifyNote": "完成时也会发送一条系统通知。",
+      "focus.customPlaceholder": "自定义分钟数",
+      "focus.customStart": "自定义开始",
+      "focus.customInvalid": "请输入 1–1440 分钟之间的自定义时长",
       "focus.sessionsToday": "今日专注次数",
       "focus.minutesToday": "今日专注时长",
 

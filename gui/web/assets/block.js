@@ -1,5 +1,6 @@
 (() => {
   const $ = (s, r = document) => r.querySelector(s);
+  const $$ = (s, r = document) => Array.from(r.querySelectorAll(s));
   const token = $('meta[name="focusd-token"]').content;
   const state = { info: null, quoteIndex: 0, timer: null, busy: false };
 
@@ -157,6 +158,22 @@
   const modal = $("#modal");
   const reason = $("#reason");
   const confirm = $("#confirmBypass");
+  let bypassMinutes = 10;
+  const customBypass = $("#customBypassMinutes");
+  $$("[data-bypass-minutes]", modal).forEach(function (button) {
+    button.addEventListener("click", function () {
+      bypassMinutes = parseInt(button.dataset.bypassMinutes, 10) || 10;
+      customBypass.value = "";
+      $$("[data-bypass-minutes]", modal).forEach(function (b) { b.classList.toggle("active", b === button); });
+    });
+  });
+  customBypass.addEventListener("input", function () {
+    const value = parseInt(customBypass.value, 10);
+    if (value >= 1 && value <= 1440) {
+      bypassMinutes = value;
+      $$("[data-bypass-minutes]", modal).forEach(function (b) { b.classList.remove("active"); });
+    }
+  });
 
   const openBypass = () => {
     modal.hidden = false;
@@ -183,12 +200,13 @@
   confirm.addEventListener("click", async () => {
     const text = reason.value.trim();
     if (text.length < 2 || state.busy) return;
+    if (bypassMinutes < 1 || bypassMinutes > 1440) return showToast("放行时长需要在 1–1440 分钟之间", true);
     state.busy = true;
     confirm.disabled = true;
     try {
-      await api("/api/block/bypass", { method: "POST", body: JSON.stringify({ reason: text }) });
+      await api("/api/block/bypass", { method: "POST", body: JSON.stringify({ reason: text, minutes: bypassMinutes }) });
       modal.hidden = true;
-      showToast("已临时放行 " + state.info.bypassMinutes + " 分钟，本次选择已记录。");
+      showToast("已临时放行 " + bypassMinutes + " 分钟，本次选择已记录。");
     } catch (err) {
       showToast(err.message, true);
       confirm.disabled = false;

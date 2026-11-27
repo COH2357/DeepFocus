@@ -987,6 +987,8 @@
         '<div class="timer-state" id="timerState">' + esc(active ? (finished ? t("focus.done") : t("focus.running")) : t("focus.ready")) + "</div>" +
         '<div class="timer-sub">' + esc(active ? fmtDuration(totalSeconds) : t("focus.activeHint")) + "</div></div></div>" +
       '<div class="preset-row">' + presetHTML + "</div>" +
+      '<div class="custom-focus"><input id="customFocusMinutes" class="input mono" type="number" min="1" max="1440" step="1" placeholder="' + esc(t("focus.customPlaceholder")) + '"' + (active ? " disabled" : "") + ">" +
+        '<button class="btn btn-sm" data-action="start-custom-focus"' + (active ? " disabled" : "") + ">" + esc(t("focus.customStart")) + "</button></div>" +
       '<div class="focus-actions">' +
         (active
           ? '<button class="btn btn-danger btn-lg" data-action="stop-pomodoro">' + icon("pause") + esc(t("focus.stop")) + "</button>"
@@ -1575,6 +1577,17 @@
       case "start-pomodoro":
         await startPomodoro();
         break;
+      case "start-custom-focus": {
+        const input = $("#customFocusMinutes");
+        const minutes = parseInt(input ? input.value : "", 10);
+        if (!minutes || minutes < 1 || minutes > 1440) {
+          toast(t("focus.customInvalid"), "err");
+          break;
+        }
+        state.selectedPreset = minutes;
+        await startPomodoro();
+        break;
+      }
       case "stop-pomodoro":
         await stopPomodoro();
         break;
