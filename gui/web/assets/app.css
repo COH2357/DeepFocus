@@ -765,8 +765,10 @@ table.app-table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
 
 /* ---------- Settings ---------- */
 
-.settings-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; align-items: start; }
-.settings-grid .full { grid-column: 1 / -1; }
+.settings-grid { column-count: 2; column-gap: 16px; }
+.settings-grid > .card { display: inline-block; width: 100%; margin: 0 0 16px; break-inside: avoid; vertical-align: top; }
+.settings-grid > .full { column-span: all; margin-bottom: 16px; }
+.settings-grid > .full > .card { margin-bottom: 0; }
 .setting-row { display: flex; align-items: center; justify-content: space-between; gap: 18px; padding: 13px 0; border-top: 1px solid var(--line); }
 .setting-row:first-of-type { border-top: 0; padding-top: 2px; }
 .setting-text { min-width: 0; }
@@ -904,7 +906,8 @@ table.app-table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
   .tracker-pill { padding: 10px; justify-content: center; }
   .foot-row { flex-direction: column; }
   .page-head { flex-direction: column; align-items: flex-start; gap: 12px; }
-  .grid-3, .grid-2, .settings-grid { grid-template-columns: minmax(0, 1fr); }
+  .grid-3, .grid-2 { grid-template-columns: minmax(0, 1fr); }
+  .settings-grid { column-count: 1; }
   .grid-4 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .limit-row { grid-template-columns: 34px minmax(0,1fr) auto; }
   .limit-row .status-pill { display: none; }
