@@ -206,6 +206,38 @@ func createSchema() error {
 		PRIMARY KEY (kind, target)
 	);
 
+	CREATE TABLE IF NOT EXISTS block_holds (
+		kind TEXT NOT NULL,
+		target TEXT NOT NULL,
+		until_ts INTEGER NOT NULL,
+		PRIMARY KEY (kind, target)
+	);
+
+	CREATE TABLE IF NOT EXISTS app_open_sessions (
+		id INTEGER PRIMARY KEY AUTOINCREMENT,
+		date TEXT NOT NULL,
+		app_key TEXT NOT NULL,
+		exe_name TEXT,
+		opened_at INTEGER NOT NULL,
+		closed_at INTEGER,
+		deadline INTEGER NOT NULL,
+		minutes INTEGER NOT NULL
+	);
+	CREATE INDEX IF NOT EXISTS idx_app_open_date ON app_open_sessions(date, app_key);
+
+	CREATE TABLE IF NOT EXISTS site_allowances (
+		site TEXT PRIMARY KEY,
+		until_ts INTEGER NOT NULL,
+		reason TEXT NOT NULL,
+		created_at INTEGER NOT NULL
+	);
+
+	CREATE TABLE IF NOT EXISTS extension_status (
+		browser TEXT PRIMARY KEY,
+		seen_at INTEGER NOT NULL,
+		version TEXT NOT NULL
+	);
+
 	`
 
 	_, err := db.Exec(schema)

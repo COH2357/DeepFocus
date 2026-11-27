@@ -10,6 +10,9 @@ if errorlevel 1 exit /b %errorlevel%
 go build -ldflags="-s -w -H=windowsgui -X 'focusd/system.Version=dev-build'" -trimpath -o deepfocus_daemon.exe ./cmd/deepfocus_daemon
 if errorlevel 1 exit /b %errorlevel%
 
+go build -ldflags="-s -w -H=windowsgui -X 'focusd/system.Version=dev-build'" -trimpath -o deepfocus_native.exe ./cmd/deepfocus_native
+if errorlevel 1 exit /b %errorlevel%
+
 makensis /DVERSION=dev-build installer.nsi
 if errorlevel 1 exit /b %errorlevel%
 

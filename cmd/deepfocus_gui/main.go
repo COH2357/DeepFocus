@@ -18,6 +18,8 @@ func main() {
 		used := fs.Int("used", 0, "used seconds")
 		hwnd := fs.Uint64("hwnd", 0, "window to restore after bypass")
 		pid := fs.Uint64("pid", 0, "process to watch for an app limit")
+		unit := fs.String("unit", "minutes", "minutes or opens")
+		maxOpens := fs.Int("max-opens", 0, "daily open ceiling")
 		if err := fs.Parse(os.Args[2:]); err != nil {
 			gui.ShowFatal(err)
 			return
@@ -30,6 +32,8 @@ func main() {
 			UsedSeconds:  *used,
 			HWND:         uintptr(*hwnd),
 			PID:          uint32(*pid),
+			Unit:         *unit,
+			MaxOpens:     *maxOpens,
 		}); err != nil {
 			gui.ShowFatal(err)
 		}

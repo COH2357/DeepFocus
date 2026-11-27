@@ -13,18 +13,26 @@ import (
 	"golang.org/x/sys/windows"
 )
 
+type AppOpenLimit struct {
+	MaxOpens       int `json:"max_opens"`
+	MinutesPerOpen int `json:"minutes_per_open"`
+}
+
 type UserConfig struct {
-	WhitelistApps         []string       `json:"whitelist_apps"`
-	BreakReminderEnabled  bool           `json:"break_reminder_enabled"`
-	BreakReminderMinutes  int            `json:"break_reminder_minutes"`
-	AppTimeLimits         map[string]int `json:"app_time_limits"`
-	SiteTimeLimits        map[string]int `json:"site_time_limits"`
-	Language              string         `json:"language"`
-	PomodoroMinutes       int            `json:"pomodoro_minutes"`
-	SnoozeDurationMinutes int            `json:"snooze_duration_minutes"`
-	CustomBrowsers        []string       `json:"custom_browsers"`
-	IdleThresholdMinutes  int            `json:"idle_threshold_minutes"`
-	TrackWhileIdle        bool           `json:"track_while_idle"`
+	WhitelistApps         []string                `json:"whitelist_apps"`
+	BreakReminderEnabled  bool                    `json:"break_reminder_enabled"`
+	BreakReminderMinutes  int                     `json:"break_reminder_minutes"`
+	AppTimeLimits         map[string]int          `json:"app_time_limits"`
+	AppOpenLimits         map[string]AppOpenLimit `json:"app_open_limits"`
+	SiteTimeLimits        map[string]int          `json:"site_time_limits"`
+	Language              string                  `json:"language"`
+	StrongWebMode         bool                    `json:"strong_web_mode"`
+	WebAllowlist          []string                `json:"web_allowlist"`
+	PomodoroMinutes       int                     `json:"pomodoro_minutes"`
+	SnoozeDurationMinutes int                     `json:"snooze_duration_minutes"`
+	CustomBrowsers        []string                `json:"custom_browsers"`
+	IdleThresholdMinutes  int                     `json:"idle_threshold_minutes"`
+	TrackWhileIdle        bool                    `json:"track_while_idle"`
 	// TrackWhilePlaying keeps the clock running while media is audible, so
 	// watching a video without touching the keyboard or mouse is still counted.
 	TrackWhilePlaying bool `json:"track_while_playing"`
@@ -44,22 +52,25 @@ type UserConfig struct {
 // pointer so an absent key is distinguishable from an explicit zero, which
 // means "never treat me as idle".
 type userConfigFile struct {
-	WhitelistApps         []string          `json:"whitelist_apps"`
-	BreakReminderEnabled  bool              `json:"break_reminder_enabled"`
-	BreakReminderMinutes  int               `json:"break_reminder_minutes"`
-	AppTimeLimits         map[string]int    `json:"app_time_limits"`
-	SiteTimeLimits        map[string]int    `json:"site_time_limits"`
-	Language              string            `json:"language"`
-	PomodoroMinutes       int               `json:"pomodoro_minutes"`
-	SnoozeDurationMinutes int               `json:"snooze_duration_minutes"`
-	CustomBrowsers        []string          `json:"custom_browsers"`
-	IdleThresholdMinutes  *int              `json:"idle_threshold_minutes"`
-	TrackWhileIdle        *bool             `json:"track_while_idle"`
-	TrackWhilePlaying     *bool             `json:"track_while_playing"`
-	CloseToTray           *bool             `json:"close_to_tray"`
-	RedactTitles          bool              `json:"redact_titles"`
-	DisplayOverrides      map[string]string `json:"display_overrides"`
-	SiteOverrides         map[string]string `json:"site_overrides"`
+	WhitelistApps         []string                `json:"whitelist_apps"`
+	BreakReminderEnabled  bool                    `json:"break_reminder_enabled"`
+	BreakReminderMinutes  int                     `json:"break_reminder_minutes"`
+	AppTimeLimits         map[string]int          `json:"app_time_limits"`
+	AppOpenLimits         map[string]AppOpenLimit `json:"app_open_limits"`
+	SiteTimeLimits        map[string]int          `json:"site_time_limits"`
+	Language              string                  `json:"language"`
+	StrongWebMode         bool                    `json:"strong_web_mode"`
+	WebAllowlist          []string                `json:"web_allowlist"`
+	PomodoroMinutes       int                     `json:"pomodoro_minutes"`
+	SnoozeDurationMinutes int                     `json:"snooze_duration_minutes"`
+	CustomBrowsers        []string                `json:"custom_browsers"`
+	IdleThresholdMinutes  *int                    `json:"idle_threshold_minutes"`
+	TrackWhileIdle        *bool                   `json:"track_while_idle"`
+	TrackWhilePlaying     *bool                   `json:"track_while_playing"`
+	CloseToTray           *bool                   `json:"close_to_tray"`
+	RedactTitles          bool                    `json:"redact_titles"`
+	DisplayOverrides      map[string]string       `json:"display_overrides"`
+	SiteOverrides         map[string]string       `json:"site_overrides"`
 }
 
 const (
@@ -90,8 +101,11 @@ func defaultUserConfig() *UserConfig {
 		BreakReminderEnabled:  false,
 		BreakReminderMinutes:  60,
 		AppTimeLimits:         make(map[string]int),
+		AppOpenLimits:         make(map[string]AppOpenLimit),
 		SiteTimeLimits:        make(map[string]int),
 		Language:              "",
+		StrongWebMode:         false,
+		WebAllowlist:          defaultWebAllowlist(),
 		PomodoroMinutes:       25,
 		SnoozeDurationMinutes: 60,
 		CustomBrowsers:        []string{},
@@ -102,6 +116,14 @@ func defaultUserConfig() *UserConfig {
 		RedactTitles:          false,
 		DisplayOverrides:      make(map[string]string),
 		SiteOverrides:         make(map[string]string),
+	}
+}
+
+func defaultWebAllowlist() []string {
+	return []string{
+		"google.com", "bing.com", "baidu.com", "duckduckgo.com",
+		"search.brave.com", "yandex.com", "ecosia.org", "startpage.com",
+		"so.com", "sogou.com",
 	}
 }
 
@@ -147,8 +169,11 @@ func reloadFromDiskLocked(force bool) {
 			userConfig.BreakReminderEnabled = temp.BreakReminderEnabled
 			userConfig.BreakReminderMinutes = temp.BreakReminderMinutes
 			userConfig.AppTimeLimits = temp.AppTimeLimits
+			userConfig.AppOpenLimits = temp.AppOpenLimits
 			userConfig.SiteTimeLimits = temp.SiteTimeLimits
 			userConfig.Language = temp.Language
+			userConfig.StrongWebMode = temp.StrongWebMode
+			userConfig.WebAllowlist = temp.WebAllowlist
 			userConfig.PomodoroMinutes = temp.PomodoroMinutes
 			userConfig.SnoozeDurationMinutes = temp.SnoozeDurationMinutes
 			userConfig.CustomBrowsers = temp.CustomBrowsers
@@ -181,6 +206,12 @@ func reloadFromDiskLocked(force bool) {
 
 	if userConfig.AppTimeLimits == nil {
 		userConfig.AppTimeLimits = make(map[string]int)
+	}
+	if userConfig.AppOpenLimits == nil {
+		userConfig.AppOpenLimits = make(map[string]AppOpenLimit)
+	}
+	if len(userConfig.WebAllowlist) == 0 {
+		userConfig.WebAllowlist = defaultWebAllowlist()
 	}
 	if userConfig.SiteTimeLimits == nil {
 		userConfig.SiteTimeLimits = make(map[string]int)
@@ -464,6 +495,102 @@ func SetAppTimeLimit(exeName string, minutes int) error {
 		userConfig.AppTimeLimits[exeName] = minutes
 	}
 	return saveUserConfigLocked()
+}
+
+func GetAppOpenLimits() map[string]AppOpenLimit {
+	loadFromDisk()
+	configMu.RLock()
+	defer configMu.RUnlock()
+	out := make(map[string]AppOpenLimit, len(userConfig.AppOpenLimits))
+	for k, v := range userConfig.AppOpenLimits {
+		out[k] = v
+	}
+	return out
+}
+
+func SetAppOpenLimit(appKey string, maxOpens, minutesPerOpen int) error {
+	release, err := beginConfigUpdate()
+	if err != nil {
+		return err
+	}
+	defer release()
+	appKey = normalizeConfigName(appKey)
+	if appKey == "" {
+		return fmt.Errorf("invalid app key")
+	}
+	if maxOpens <= 0 || minutesPerOpen <= 0 {
+		delete(userConfig.AppOpenLimits, appKey)
+	} else {
+		userConfig.AppOpenLimits[appKey] = AppOpenLimit{
+			MaxOpens:       maxOpens,
+			MinutesPerOpen: minutesPerOpen,
+		}
+	}
+	return saveUserConfigLocked()
+}
+
+func GetStrongWebMode() bool {
+	loadFromDisk()
+	configMu.RLock()
+	defer configMu.RUnlock()
+	return userConfig.StrongWebMode
+}
+
+func SetStrongWebMode(enabled bool) error {
+	release, err := beginConfigUpdate()
+	if err != nil {
+		return err
+	}
+	defer release()
+	userConfig.StrongWebMode = enabled
+	return saveUserConfigLocked()
+}
+
+func GetWebAllowlist() []string {
+	loadFromDisk()
+	configMu.RLock()
+	defer configMu.RUnlock()
+	out := make([]string, len(userConfig.WebAllowlist))
+	copy(out, userConfig.WebAllowlist)
+	return out
+}
+
+func SetWebAllowlist(entries []string) error {
+	release, err := beginConfigUpdate()
+	if err != nil {
+		return err
+	}
+	defer release()
+	seen := make(map[string]bool)
+	out := make([]string, 0, len(entries))
+	for _, entry := range entries {
+		entry = strings.ToLower(strings.TrimSpace(entry))
+		entry = strings.TrimPrefix(strings.TrimPrefix(entry, "https://"), "http://")
+		entry = strings.Trim(entry, "/ ")
+		if entry == "" || seen[entry] {
+			continue
+		}
+		seen[entry] = true
+		out = append(out, entry)
+	}
+	userConfig.WebAllowlist = out
+	return saveUserConfigLocked()
+}
+
+// ExeNameForLimitKey turns a configured app limit key into the process image
+// name used by the process snapshot. App ids look like "msedge|<hash>".
+func ExeNameForLimitKey(key string) string {
+	key = strings.TrimSpace(strings.ToLower(key))
+	if i := strings.Index(key, "|"); i > 0 {
+		key = key[:i]
+	}
+	if key == "" {
+		return ""
+	}
+	if !strings.HasSuffix(key, ".exe") {
+		key += ".exe"
+	}
+	return key
 }
 
 func GetSiteTimeLimits() map[string]int {

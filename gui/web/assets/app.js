@@ -1030,18 +1030,24 @@
     const limits = data.limits || [];
     const rows = limits.map(function (lim) {
       const pct = Math.min(100, Math.max(0, lim.percent));
-      const remaining = lim.minutes * 60 - lim.usedSeconds;
-      const foot = lim.status === "over"
-        ? t("limits.overBy", { time: fmtDuration(Math.abs(remaining)) })
-        : t("limits.remaining", { time: fmtDuration(Math.max(0, remaining)) });
+      const opens = lim.mode === "opens";
+      const remaining = opens ? Math.max(0, (lim.maxOpens || 0) - (lim.opensUsed || 0)) : lim.minutes * 60 - lim.usedSeconds;
+      const foot = opens
+        ? t("limits.opensLeft", { n: remaining })
+        : (lim.status === "over"
+          ? t("limits.overBy", { time: fmtDuration(Math.abs(remaining)) })
+          : t("limits.remaining", { time: fmtDuration(Math.max(0, remaining)) }));
+      const meta = opens
+        ? t("limits.opensMeta", { used: lim.opensUsed || 0, max: lim.maxOpens || 0, min: lim.minutesPerOpen || 0 })
+        : esc(fmtDuration(lim.usedSeconds)) + " / " + esc(fmtDuration(lim.minutes * 60)) + " · " + esc(t(lim.status === "over" ? "limits.statusOver" : "limits.limit"));
       return '<div class="limit-row ' + esc(lim.status) + '">' +
         '<span class="app-icon">' + initial(lim.name) + "</span>" +
         '<div style="min-width:0"><div class="between" style="gap:8px"><div class="limit-name">' + esc(lim.name) + "</div>" +
           '<span class="status-pill ' + esc(lim.status) + '">' + esc(t("limits.status" + cap(lim.status))) + "</span></div>" +
-          '<div class="limit-meta">' + esc(fmtDuration(lim.usedSeconds)) + " / " + esc(fmtDuration(lim.minutes * 60)) + " · " + esc(t(lim.status === "over" ? "limits.statusOver" : "limits.limit")) + "</div>" +
+          '<div class="limit-meta">' + meta + "</div>" +
           '<div class="limit-progress"><i style="width:' + pct + '%"></i></div>' +
           '<div class="limit-meta" style="margin-top:5px">' + esc(foot) + "</div></div>" +
-        '<div class="limit-time">' + pct + "%<br><small>" + esc(fmtDuration(lim.minutes * 60)) + "</small></div>" +
+        '<div class="limit-time">' + pct + "%<br><small>" + esc(opens ? (lim.maxOpens || 0) + " " + t("limits.opensUnit") : fmtDuration(lim.minutes * 60)) + "</small></div>" +
         '<button class="icon-btn" title="' + esc(t("limits.delete")) + '" data-action="delete-limit" data-key="' + esc(lim.key) + '" data-name="' + esc(lim.name) + '">' + icon("trash") + "</button></div>";
     }).join("");
 
@@ -1123,8 +1129,17 @@
         '<div class="field"><label for="limitKey">' + esc(t("limits.customExe")) + "</label>" +
           '<input class="input" id="limitKey" name="key" autocomplete="off" placeholder="steam.exe" value="' + esc(preset.key || "") + '">' +
           '<span class="hint">' + esc(t("limits.customHint")) + "</span></div>" +
-        '<div class="field"><label for="limitMinutes">' + esc(t("limits.minutesLabel")) + "</label>" +
-          '<input class="input mono" id="limitMinutes" name="minutes" type="number" min="1" max="1440" step="1" value="60"></div>' +
+        '<div class="field"><label>' + esc(t("limits.modeLabel")) + "</label>" +
+          '<div style="display:flex;gap:8px"><button type="button" class="btn btn-sm mode-btn selected" data-limit-mode="time">' + esc(t("limits.modeTime")) + "</button>" +
+          '<button type="button" class="btn btn-sm mode-btn" data-limit-mode="opens">' + esc(t("limits.modeOpens")) + "</button></div></div>" +
+        '<div id="timeFields"><div class="field"><label for="limitMinutes">' + esc(t("limits.minutesLabel")) + "</label>" +
+          '<input class="input mono" id="limitMinutes" name="minutes" type="number" min="1" max="1440" step="1" value="60"></div></div>' +
+        '<div id="openFields" style="display:none">' +
+          '<div class="field"><label for="maxOpens">' + esc(t("limits.maxOpensLabel")) + "</label>" +
+            '<input class="input mono" id="maxOpens" name="maxOpens" type="number" min="1" max="100" step="1" value="3"></div>' +
+          '<div class="field"><label for="minutesPerOpen">' + esc(t("limits.perOpenLabel")) + "</label>" +
+            '<input class="input mono" id="minutesPerOpen" name="minutesPerOpen" type="number" min="1" max="1440" step="1" value="15"></div>' +
+          '<span class="hint">' + esc(t("limits.openHint")) + "</span></div>" +
         '<div class="chips-empty" data-selected-name style="padding:0;color:var(--accent)">' +
           (preset.name ? esc(preset.name) : "") + "</div>" +
       "</div>" +
@@ -1135,6 +1150,15 @@
           const keyInput = $("#limitKey", modal);
           const selectedName = $("[data-selected-name]", modal);
           let selectedKey = preset.key || "";
+          let limitMode = "time";
+          $$("[data-limit-mode]", modal).forEach(function (button) {
+            button.addEventListener("click", function () {
+              limitMode = button.dataset.limitMode;
+              $$("[data-limit-mode]", modal).forEach(function (b) { b.classList.toggle("selected", b === button); });
+              $("#timeFields", modal).style.display = limitMode === "time" ? "" : "none";
+              $("#openFields", modal).style.display = limitMode === "opens" ? "" : "none";
+            });
+          });
 
           $$("[data-suggest]", modal).forEach(function (button) {
             button.addEventListener("click", function () {
@@ -1156,12 +1180,20 @@
 
           $("#limitForm", modal).addEventListener("submit", async function (event) {
             event.preventDefault();
-            const minutes = parseInt($("#limitMinutes", modal).value, 10);
             const key = keyInput.value.trim() || selectedKey;
             if (!key) return toast(t("limits.selectApp"), "err");
-            if (!minutes || minutes < 1 || minutes > 1440) return toast(t("limits.minutesInvalid"), "err");
             try {
-              await act("limit-set", { key: key, minutes: minutes });
+              if (limitMode === "opens") {
+                const maxOpens = parseInt($("#maxOpens", modal).value, 10);
+                const minutesPerOpen = parseInt($("#minutesPerOpen", modal).value, 10);
+                if (!maxOpens || maxOpens < 1 || maxOpens > 100) return toast(t("limits.opensInvalid"), "err");
+                if (!minutesPerOpen || minutesPerOpen < 1 || minutesPerOpen > 1440) return toast(t("limits.minutesInvalid"), "err");
+                await act("limit-set", { key: key, mode: "opens", maxOpens: maxOpens, minutesPerOpen: minutesPerOpen });
+              } else {
+                const minutes = parseInt($("#limitMinutes", modal).value, 10);
+                if (!minutes || minutes < 1 || minutes > 1440) return toast(t("limits.minutesInvalid"), "err");
+                await act("limit-set", { key: key, mode: "time", minutes: minutes });
+              }
               closeModal();
               toast(t("limits.addedToast"));
               await loadLimits();
@@ -1230,6 +1262,26 @@
       '<div class="setting-row"><div class="setting-text"><b>' + esc(t("settings.domainGrouping")) + "</b><span>" + esc(t("settings.domainGroupingDesc")) + "</span></div>" +
       '<div class="setting-control">' + switchHTML(!!s.domainGrouping, "domain-grouping") + "</div></div></div>";
 
+    const webGuard = '<div class="card"><div class="card-head"><div><div class="card-title">' + icon("shield") + esc(t("settings.webGuard")) + "</div>" +
+      '<div class="card-sub">' + esc(t("settings.webGuardDesc")) + "</div></div></div>" +
+      '<div class="setting-row"><div class="setting-text"><b>' + esc(t("settings.strongWeb")) + "</b><span>" + esc(t("settings.strongWebDesc")) + "</span></div>" +
+        '<div class="setting-control">' + switchHTML(!!s.strongWebMode, "strong-web") + "</div></div>" +
+      '<div class="setting-row"><div class="setting-text"><b>' + esc(t("settings.extensionStatus")) + "</b><span>" +
+        esc(s.extensionActive ? t("settings.extensionConnected", { browsers: (s.extensionBrowsers || []).join(", ") }) : t("settings.extensionMissing")) + "</span></div>" +
+        '<div class="setting-control"><span class="status-pill ' + (s.extensionActive ? "" : "warn") + '">' + esc(s.extensionActive ? t("settings.extensionOn") : t("settings.extensionOff")) + "</span></div></div>" +
+      '<div class="setting-row" style="display:block"><div class="setting-text" style="margin-bottom:6px"><b>' + esc(t("settings.webAllowlist")) + "</b><span>" + esc(t("settings.webAllowlistDesc")) + "</span></div>" +
+        '<div class="chips">' + chipsHTML(s.webAllowlist, "remove-web-allow", t("settings.webAllowlistEmpty")) + "</div>" +
+        '<form class="chip-add" data-form="web-allowlist"><input class="input" name="value" placeholder="google.com" autocomplete="off"><button class="btn btn-sm" type="submit">' + esc(t("settings.addAllow")) + "</button></form>" +
+        '<p class="hint faint" style="font-size:10.5px;margin:8px 0 0">' + esc(t("settings.extensionHint")) + "</p></div></div>";
+
+
+      '<div class="setting-row"><div class="setting-text"><b>' + esc(t("settings.breakReminder")) + "</b><span>" + esc(t("focus.breakDesc")) + "</span></div>" +
+        '<div class="setting-control">' + switchHTML(s.breakReminder.enabled, "break-enabled") + "</div></div>" +
+      '<div class="setting-row"><div class="setting-text"><b>' + esc(t("settings.breakEvery")) + "</b></div>" +
+        '<div class="setting-control"><input class="input mono" type="number" min="1" max="600" step="1" value="' + s.breakReminder.minutes + '" data-setting="break-minutes" style="width:86px"><span class="faint" style="font-size:11px">' + esc(t("settings.minutes")) + "</span></div></div>" +
+      '<div class="setting-row"><div class="setting-text"><b>' + esc(t("settings.pomodoroDefault")) + "</b></div>" +
+        '<div class="setting-control"><select class="select" data-setting="pomodoro-minutes">' + pomodoroOptions(s.pomodoroMinutes) + "</select></div></div></div>";
+
     const breaks = '<div class="card"><div class="card-head"><div class="card-title">' + icon("spark") + esc(t("settings.breaks")) + "</div></div>" +
       '<div class="setting-row"><div class="setting-text"><b>' + esc(t("settings.breakReminder")) + "</b><span>" + esc(t("focus.breakDesc")) + "</span></div>" +
         '<div class="setting-control">' + switchHTML(s.breakReminder.enabled, "break-enabled") + "</div></div>" +
@@ -1288,7 +1340,7 @@
 
     return '<div class="page">' +
       pageHead(t("nav.settings"), t("settings.title"), t("settings.subtitle")) +
-      '<div class="settings-grid">' + tracking + idleCard + experimental + archive + quotes + breaks + privacy + dataCard + about + '<div class="full">' + danger + "</div></div></div>";
+      '<div class="settings-grid">' + tracking + idleCard + experimental + webGuard + archive + quotes + breaks + privacy + dataCard + about + '<div class="full">' + danger + "</div></div></div>";
   }
 
   function retentionOptions(current) {
@@ -1506,6 +1558,13 @@
           render();
         });
         break;
+      case "remove-web-allow": {
+        const list = (state.settings.webAllowlist || []).filter(function (v) { return v !== node.dataset.value; });
+        await act("web-allowlist", { allowlist: list });
+        await loadSettings();
+        render();
+        break;
+      }
       case "quotes":
         openQuotesModal();
         break;
@@ -1688,6 +1747,12 @@
           await setPaused(input.checked);
           break;
         }
+        case "strong-web": {
+          await act("strong-web", { enabled: input.checked });
+          state.settings.strongWebMode = input.checked;
+          toast(t("settings.saved"));
+          break;
+        }
         case "redact": {
           await act("redact-titles", { redactTitles: input.checked });
           state.settings.redactTitles = input.checked;
@@ -1827,6 +1892,22 @@
         toast(t("limits.addedToast"));
         await loadLimits();
         render();
+      } catch (err) {
+        toastError(err);
+      }
+      return;
+    }
+    if (kind === "web-allowlist") {
+      const value = form.elements.value.value.trim();
+      if (!value) return;
+      const list = (state.settings.webAllowlist || []).slice();
+      if (list.indexOf(value) < 0) list.push(value);
+      try {
+        await act("web-allowlist", { allowlist: list });
+        form.reset();
+        await loadSettings();
+        render();
+        toast(t("settings.saved"));
       } catch (err) {
         toastError(err);
       }

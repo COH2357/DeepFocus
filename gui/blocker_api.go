@@ -1,6 +1,7 @@
 package gui
 
 import (
+	"focusd/coreapi"
 	"focusd/storage"
 	"focusd/system"
 	"net/http"
@@ -22,6 +23,8 @@ type blockInfoData struct {
 	QuoteCount     int      `json:"quoteCount"`
 	ProcessRunning bool     `json:"processRunning"`
 	Mode           string   `json:"mode"`
+	Unit           string   `json:"unit"`
+	MaxOpens       int      `json:"maxOpens"`
 	Quotes         []string `json:"quotes"`
 }
 
@@ -46,6 +49,8 @@ func (a *app) blockInfo(w http.ResponseWriter, r *http.Request) error {
 		QuoteCount:     len(quotes),
 		ProcessRunning: system.TargetAlive(a.block.HWND, a.block.PID),
 		Mode:           a.block.Kind,
+		Unit:           a.block.Unit,
+		MaxOpens:       a.block.MaxOpens,
 		Quotes:         texts,
 	})
 }
@@ -138,13 +143,28 @@ func (a *app) blockDragStart(w http.ResponseWriter, r *http.Request) error {
 	return writeJSON(w, map[string]interface{}{"ok": true})
 }
 
-// blockLeave closes the blocked browser tab and restores the browser. It is
-// different from a bypass: no extra allowance is granted, so re-opening the
-// site will trigger the limit again.
+// blockLeave closes every tab of the blocked website, then restores the
+// browser. It is different from a bypass: no extra allowance is granted, so
+// re-opening the site will trigger the limit again. Closing only the active
+// tab would leave other tabs of the same site in front and make the guard
+// minimize the browser again as soon as it is opened.
 func (a *app) blockLeave(w http.ResponseWriter, r *http.Request) error {
+	target := a.block.Target
+	// Keep the guard quiet while the browser is being restored and its tabs
+	// are being closed; otherwise it minimizes the browser mid-operation.
+	_ = storage.SetBlockHold("site", target, time.Now().Add(45*time.Second))
+	defer storage.ClearBlockHold("site", target)
+
+	// Hide the blocker before the sweep, then force the browser foreground in
+	// CloseBrowserTabs. The force path attaches to the input queues, which is
+	// required because simply calling SetForegroundWindow after hiding is
+	// rejected by Windows and leaves Task Manager or Task View in front.
 	hideBlockWindow()
-	system.CloseActiveTab(a.block.HWND)
-	if err := writeJSON(w, map[string]interface{}{"ok": true}); err != nil {
+	time.Sleep(100 * time.Millisecond)
+	closed := system.CloseBrowserTabs(a.block.HWND, func(title string) bool {
+		return coreapi.SiteClassForTitle(title) == target
+	})
+	if err := writeJSON(w, map[string]interface{}{"ok": true, "closed": closed}); err != nil {
 		return err
 	}
 	closeBlockWindowAfter(350 * time.Millisecond)

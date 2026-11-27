@@ -14,12 +14,17 @@ type BlockOptions struct {
 	UsedSeconds  int
 	HWND         uintptr
 	PID          uint32
+	Unit         string
+	MaxOpens     int
 }
 
 // RunBlocker is the entry point for `deepfocus_gui.exe --block`. It starts a
 // small local server and a dedicated topmost window. The blocker is a separate
 // process so it still appears when the main DeepFocus window is closed.
 func RunBlocker(opts BlockOptions) error {
+	if opts.Unit == "" {
+		opts.Unit = "minutes"
+	}
 	if err := storage.Init(); err != nil {
 		return err
 	}

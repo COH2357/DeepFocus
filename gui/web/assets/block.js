@@ -62,16 +62,31 @@
       } else {
         $("#leaveBtn").hidden = false;
         $("#leaveBtn").disabled = false;
-        $("#leaveBtn").textContent = "退出该网页";
-        $("#cardCopy").textContent = "这个网站今天已经到上限。你可以退出当前标签页，或者临时放行 10 分钟。";
-        $("#auditText").textContent = "每次突破都会记录在本地；退出网页不会获得额外额度。";
+        $("#leaveBtn").textContent = "关闭该网站全部标签页";
+        $("#cardCopy").textContent = "这个网站今天已经到上限。关闭全部该网站标签页，或者临时放行 10 分钟。";
+        $("#auditText").textContent = "只会关闭该网站的标签页，其它标签页保留；每次突破都会记录在本地。";
       }
-      $("#usageText").textContent = fmt(info.usedSeconds);
-      $("#limitText").textContent = "上限 " + fmt(info.limitMinutes * 60);
-      const over = Math.max(0, info.usedSeconds - info.limitMinutes * 60);
-      $("#overText").textContent = over > 0 ? "已超出 " + fmt(over) : "接近上限";
+      const isOpens = info.mode === "app" && info.unit === "opens";
+      if (isOpens) {
+        $("#usageLabel").textContent = "今天已经打开";
+        $("#usageText").textContent = (info.usedSeconds || 0) + " 次";
+        $("#limitText").textContent = "每日上限 " + (info.maxOpens || info.limitMinutes || 0) + " 次";
+        $("#overText").textContent = (info.usedSeconds || 0) >= (info.maxOpens || info.limitMinutes || 0) ? "今日次数已用完" : "还可打开";
+        $("#cardCopy").textContent = "这个应用今天的打开次数已经用完。关闭提醒不会重置次数；下次启动会再次被拦下。";
+        $("#auditText").textContent = "只有所有进程退出后再次启动才计为一次；最小化到托盘不算退出。";
+      } else {
+        $("#usageText").textContent = fmt(info.usedSeconds);
+        $("#limitText").textContent = "上限 " + fmt(info.limitMinutes * 60);
+        const over = Math.max(0, info.usedSeconds - info.limitMinutes * 60);
+        $("#overText").textContent = over > 0 ? "已超出 " + fmt(over) : "接近上限";
+      }
       $("#bypassMinutes").textContent = info.bypassMinutes;
-      const pct = Math.min(100, Math.round((info.usedSeconds / Math.max(1, info.limitMinutes * 60)) * 100));
+      let pct;
+      if (isOpens) {
+        pct = Math.min(100, Math.round(((info.usedSeconds || 0) / Math.max(1, info.maxOpens || info.limitMinutes || 1)) * 100));
+      } else {
+        pct = Math.min(100, Math.round((info.usedSeconds / Math.max(1, info.limitMinutes * 60)) * 100));
+      }
       const bar = $("#usageBar");
       bar.style.width = pct + "%";
       bar.classList.toggle("over", pct >= 100);
@@ -127,8 +142,12 @@
     if (isApp && state.info.processRunning) return;
     state.busy = true;
     try {
-      await api(isApp ? "/api/block/close" : "/api/block/leave", { method: "POST", body: "{}" });
-      if (!isApp) showToast("正在关闭当前网页…");
+      if (!isApp) showToast("正在关闭该网站的全部标签页…");
+      const data = await api(isApp ? "/api/block/close" : "/api/block/leave", { method: "POST", body: "{}" });
+      if (!isApp) {
+        const count = Number(data.closed || 0);
+        showToast(count > 0 ? "已关闭 " + count + " 个该网站标签页。" : "没有找到可关闭的该网站标签页。");
+      }
     } catch (err) {
       showToast(err.message, true);
       state.busy = false;

@@ -116,6 +116,19 @@ At **80% used** the daemon sends a local notification with the time remaining. A
 
 Each bypass stores the reason locally, grants 10 minutes, and adds a higher-severity row to **Limits → Limit breaks**. Reasons are for the audit trail only; they do not decide whether the bypass is granted. Quotes on the pause page are editable in **Settings → Blocker quotes**; at least one is required.
 
+### Daily open limits
+
+An app limit can also use **daily opens + minutes per open** instead of a total daily duration. An open is counted only when every process with that executable name has exited and the app is started again. Minimising to the tray, changing to another app, or locking the screen does not count as an exit. Each run gets its own timer; when it expires the non-closable reminder returns, and a bypass extends that run by ten minutes. The remaining open count is shown in **Limits**. The definition is deliberately process-based, so a background/tray process does not accidentally consume extra opens.
+
+### Strong web supervision (browser extension)
+
+DeepFocus ships a Manifest V3 extension in `extension/` and a native-messaging host (`deepfocus_native.exe`). The installer registers `com.deepfocus.host` for Edge and Chrome and copies the extension to `%APPDATA%\focusd\extension`. Load it once from `edge://extensions` or `chrome://extensions` with **Developer mode → Load unpacked**.
+
+When the extension is connected, site limits are enforced at the URL/navigation level rather than by minimising the browser: the extension asks the native host before a top-level navigation, shows the DeepFocus pause page for a blocked site, and applies the grant to the whole site class and all its tabs/subdomains. **Settings → Strong web supervision** adds a strong mode where every non-allowlisted site needs a reason and an allow duration; the search-engine/homepage allowlist is editable there. If the host is offline, the extension fails closed to a local “service not running” page. Browsers without the extension keep using the foreground-window fallback.
+
+The native host can be registered manually with `deepfocus_native.exe --install`.
+
+
 ### Whitelist and built-in exclusions
 Whitelisted executables are skipped entirely by the tracker (never recorded). DeepFocus also excludes its own binaries (`deepfocus.exe`, `deepfocus_gui.exe`, `deepfocus_daemon.exe`, plus the legacy `focusd*.exe` names) and Windows shell/lock surfaces such as `LockApp.exe`, `LogonUI.exe`, `ShellExperienceHost.exe`, `StartMenuExperienceHost.exe`, `SearchHost.exe`, `TextInputHost.exe` and `ApplicationFrameHost.exe`. These rows are filtered out of the dashboard, stats and session lists as well, so they disappear immediately rather than lingering until retention.
 

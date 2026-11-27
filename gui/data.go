@@ -87,14 +87,18 @@ type statsData struct {
 }
 
 type limitEntry struct {
-	Key         string `json:"key"`
-	Name        string `json:"name"`
-	Exe         string `json:"exe"`
-	AppID       string `json:"appId"`
-	Minutes     int    `json:"minutes"`
-	UsedSeconds int    `json:"usedSeconds"`
-	Percent     int    `json:"percent"`
-	Status      string `json:"status"`
+	Key            string `json:"key"`
+	Name           string `json:"name"`
+	Exe            string `json:"exe"`
+	AppID          string `json:"appId"`
+	Minutes        int    `json:"minutes"`
+	UsedSeconds    int    `json:"usedSeconds"`
+	Percent        int    `json:"percent"`
+	Status         string `json:"status"`
+	Mode           string `json:"mode,omitempty"`
+	MaxOpens       int    `json:"maxOpens,omitempty"`
+	MinutesPerOpen int    `json:"minutesPerOpen,omitempty"`
+	OpensUsed      int    `json:"opensUsed,omitempty"`
 }
 
 type siteLimitEntry struct {
@@ -118,34 +122,48 @@ type idleSettings struct {
 }
 
 type settingsData struct {
-	Version          string           `json:"version"`
-	DBPath           string           `json:"dbPath"`
-	InstallDir       string           `json:"installDir"`
-	DaemonRunning    bool             `json:"daemonRunning"`
-	Autostart        bool             `json:"autostart"`
-	Paused           bool             `json:"paused"`
-	RetentionDays    int              `json:"retentionDays"`
-	TrackingInterval int              `json:"trackingIntervalSeconds"`
-	Whitelist        []string         `json:"whitelist"`
-	CustomBrowsers   []string         `json:"customBrowsers"`
-	Limits           []limitEntry     `json:"limits"`
-	BreakReminder    reminderSettings `json:"breakReminder"`
-	PomodoroMinutes  int              `json:"pomodoroMinutes"`
-	SnoozeMinutes    int              `json:"snoozeMinutes"`
-	Idle             idleSettings     `json:"idle"`
-	RedactTitles     bool             `json:"redactTitles"`
-	MinRetentionDays int              `json:"minRetentionDays"`
-	MaxRetentionDays int              `json:"maxRetentionDays"`
-	MaxIdleMinutes   int              `json:"maxIdleMinutes"`
-	MediaDetectionOK bool             `json:"mediaDetection"`
-	DomainGrouping   bool             `json:"domainGrouping"`
-	CloseToTray      bool             `json:"closeToTray"`
-	KeepHistory      bool             `json:"keepHistory"`
-	ArchiveDir       string           `json:"archiveDir"`
-	ArchiveCount     int              `json:"archiveCount"`
-	ArchiveLatest    string           `json:"archiveLatest"`
-	QuoteCount       int              `json:"quoteCount"`
-	Language         string           `json:"language"`
+	Version           string           `json:"version"`
+	DBPath            string           `json:"dbPath"`
+	InstallDir        string           `json:"installDir"`
+	DaemonRunning     bool             `json:"daemonRunning"`
+	Autostart         bool             `json:"autostart"`
+	Paused            bool             `json:"paused"`
+	RetentionDays     int              `json:"retentionDays"`
+	TrackingInterval  int              `json:"trackingIntervalSeconds"`
+	Whitelist         []string         `json:"whitelist"`
+	CustomBrowsers    []string         `json:"customBrowsers"`
+	Limits            []limitEntry     `json:"limits"`
+	BreakReminder     reminderSettings `json:"breakReminder"`
+	PomodoroMinutes   int              `json:"pomodoroMinutes"`
+	SnoozeMinutes     int              `json:"snoozeMinutes"`
+	Idle              idleSettings     `json:"idle"`
+	RedactTitles      bool             `json:"redactTitles"`
+	MinRetentionDays  int              `json:"minRetentionDays"`
+	MaxRetentionDays  int              `json:"maxRetentionDays"`
+	MaxIdleMinutes    int              `json:"maxIdleMinutes"`
+	MediaDetectionOK  bool             `json:"mediaDetection"`
+	DomainGrouping    bool             `json:"domainGrouping"`
+	CloseToTray       bool             `json:"closeToTray"`
+	KeepHistory       bool             `json:"keepHistory"`
+	ArchiveDir        string           `json:"archiveDir"`
+	ArchiveCount      int              `json:"archiveCount"`
+	ArchiveLatest     string           `json:"archiveLatest"`
+	QuoteCount        int              `json:"quoteCount"`
+	Language          string           `json:"language"`
+	StrongWebMode     bool             `json:"strongWebMode"`
+	WebAllowlist      []string         `json:"webAllowlist"`
+	ExtensionActive   bool             `json:"extensionActive"`
+	ExtensionBrowsers []string         `json:"extensionBrowsers"`
+}
+
+func extensionBrowsers() []string {
+	out := []string{}
+	for _, browser := range []string{"edge", "chrome", "firefox", "brave"} {
+		if storage.ExtensionSeen(browser, 45*time.Second) {
+			out = append(out, browser)
+		}
+	}
+	return out
 }
 
 func (a *app) settingsSnapshot() settingsData {
@@ -185,15 +203,19 @@ func (a *app) settingsSnapshot() settingsData {
 		MaxIdleMinutes:   system.MaxIdleThresholdMinutes,
 		// The audio sampler is Windows-only. On a platform without it the
 		// toggle is hidden rather than silently ineffective.
-		MediaDetectionOK: mediaDetectionAvailable,
-		DomainGrouping:   storage.GetDomainGrouping(),
-		CloseToTray:      system.GetCloseToTray(),
-		KeepHistory:      storage.GetKeepHistory(),
-		ArchiveDir:       archiveDir,
-		ArchiveCount:     archiveCount,
-		ArchiveLatest:    archiveLatest,
-		QuoteCount:       len(quotes),
-		Language:         system.GetLanguage(),
+		MediaDetectionOK:  mediaDetectionAvailable,
+		DomainGrouping:    storage.GetDomainGrouping(),
+		CloseToTray:       system.GetCloseToTray(),
+		KeepHistory:       storage.GetKeepHistory(),
+		ArchiveDir:        archiveDir,
+		ArchiveCount:      archiveCount,
+		ArchiveLatest:     archiveLatest,
+		QuoteCount:        len(quotes),
+		Language:          system.GetLanguage(),
+		StrongWebMode:     system.GetStrongWebMode(),
+		WebAllowlist:      system.GetWebAllowlist(),
+		ExtensionBrowsers: extensionBrowsers(),
+		ExtensionActive:   len(extensionBrowsers()) > 0,
 	}
 }
 
@@ -576,11 +598,52 @@ func buildSiteLimitEntries() []siteLimitEntry {
 
 func (a *app) buildLimits() ([]limitEntry, error) {
 	limits := system.GetAppTimeLimits()
+	openLimits := system.GetAppOpenLimits()
 	apps := []appEntry{}
 	if stats, err := storage.GetAppStatsInRange(storage.Today(), storage.Today()); err == nil {
 		apps = aggregateApps(stats, limits)
 	}
-	return buildLimitEntries(limits, apps), nil
+	out := buildLimitEntries(limits, apps)
+	for i := range out {
+		out[i].Mode = "time"
+	}
+	names := make(map[string]string)
+	for _, app := range apps {
+		if app.AppID != "" {
+			names[app.AppID] = app.Name
+		}
+		names[strings.ToLower(app.Exe)] = app.Name
+	}
+	for key, limit := range openLimits {
+		opens := storage.CountAppOpens(storage.Today(), key)
+		percent := 0
+		if limit.MaxOpens > 0 {
+			percent = opens * 100 / limit.MaxOpens
+		}
+		status := "ok"
+		if opens >= limit.MaxOpens {
+			status = "over"
+		} else if percent >= 80 {
+			status = "warn"
+		}
+		name := names[key]
+		if name == "" {
+			name = system.ResolveDisplayName(key, system.ExeNameForLimitKey(key), "")
+		}
+		out = append(out, limitEntry{
+			Key: key, Name: name, Exe: system.ExeNameForLimitKey(key), AppID: key,
+			Minutes: limit.MinutesPerOpen, Mode: "opens", MaxOpens: limit.MaxOpens,
+			MinutesPerOpen: limit.MinutesPerOpen, OpensUsed: opens,
+			Percent: percent, Status: status,
+		})
+	}
+	sort.Slice(out, func(i, j int) bool {
+		if out[i].Status != out[j].Status {
+			return out[i].Status == "over" || (out[i].Status == "warn" && out[j].Status == "ok")
+		}
+		return strings.ToLower(out[i].Name) < strings.ToLower(out[j].Name)
+	})
+	return out, nil
 }
 
 func buildLimitEntries(limits map[string]int, apps []appEntry) []limitEntry {

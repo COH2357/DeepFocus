@@ -153,6 +153,19 @@ func GetProcessCount(name string) int {
 	return count
 }
 
+// FirstPIDForExe returns a pid for the first process with the given image name.
+func FirstPIDForExe(name string) uint32 {
+	var pid uint32
+	iterateProcesses(func(pe *processentry32w) bool {
+		if strings.EqualFold(processName(pe), name) {
+			pid = pe.ProcessID
+			return false
+		}
+		return true
+	})
+	return pid
+}
+
 func terminateProcessByPID(pid uint32) error {
 	handle, _, _ := procOpenProcess.Call(uintptr(processTerminate), 0, uintptr(pid))
 	if handle == 0 {

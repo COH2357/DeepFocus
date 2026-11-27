@@ -237,3 +237,26 @@ func ClearBlockBypass(kind, target string) error {
 	_, err := db.Exec(`DELETE FROM block_bypasses WHERE kind = ? AND target = ?`, kind, target)
 	return err
 }
+
+// SetBlockHold briefly suppresses enforcement while the blocker itself is
+// closing the matching tabs. It is not an allowance: no event is recorded and
+// enforcement resumes as soon as the hold expires or is cleared.
+func SetBlockHold(kind, target string, until time.Time) error {
+	_, err := db.Exec(`
+		INSERT INTO block_holds (kind, target, until_ts)
+		VALUES (?, ?, ?)
+		ON CONFLICT(kind, target) DO UPDATE SET until_ts = excluded.until_ts
+	`, kind, target, until.Unix())
+	return err
+}
+
+func ActiveBlockHold(kind, target string, now time.Time) bool {
+	var until int64
+	err := db.QueryRow(`SELECT until_ts FROM block_holds WHERE kind = ? AND target = ?`, kind, target).Scan(&until)
+	return err == nil && until > now.Unix()
+}
+
+func ClearBlockHold(kind, target string) error {
+	_, err := db.Exec(`DELETE FROM block_holds WHERE kind = ? AND target = ?`, kind, target)
+	return err
+}

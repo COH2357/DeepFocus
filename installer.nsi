@@ -75,6 +75,7 @@ Section "Install"
     Delete "$INSTDIR\deepfocus.exe"
     Delete "$INSTDIR\deepfocus_gui.exe"
     Delete "$INSTDIR\deepfocus_daemon.exe"
+    Delete "$INSTDIR\deepfocus_native.exe"
     IfFileExists "$INSTDIR\deepfocus_gui.exe" 0 old_files_removed
     IntOp $1 $1 + 1
     IntCmp $1 10 old_files_removed
@@ -85,6 +86,14 @@ Section "Install"
   File "deepfocus.exe"
   File "deepfocus_gui.exe"
   File "deepfocus_daemon.exe"
+  File "deepfocus_native.exe"
+
+  SetOutPath "$INSTDIR\extension"
+  File /r "extension\*.*"
+  SetOutPath "$INSTDIR"
+
+  DetailPrint "Registering the DeepFocus browser bridge..."
+  ExecWait '"$INSTDIR\deepfocus_native.exe" --install'
 
   ; Legacy names from Focusd. Removing them avoids two copies on PATH and an
   ; old daemon racing the new one.
@@ -154,6 +163,11 @@ Section "Uninstall"
   Delete "$INSTDIR\deepfocus.exe"
   Delete "$INSTDIR\deepfocus_gui.exe"
   Delete "$INSTDIR\deepfocus_daemon.exe"
+  Delete "$INSTDIR\deepfocus_native.exe"
+  RMDir /r "$INSTDIR\extension"
+  RMDir /r "$INSTDIR\native"
+  DeleteRegKey HKCU "Software\Google\Chrome\NativeMessagingHosts\com.deepfocus.host"
+  DeleteRegKey HKCU "Software\Microsoft\Edge\NativeMessagingHosts\com.deepfocus.host"
   Delete "$INSTDIR\focusd.exe"
   Delete "$INSTDIR\focusd_gui.exe"
   Delete "$INSTDIR\focusd_daemon.exe"

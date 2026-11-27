@@ -1021,3 +1021,5 @@ h1 { overflow-wrap: anywhere; text-wrap: balance; }
   .event-row { grid-template-columns: 1fr auto; }
   .event-reason { grid-column: 1 / -1; }
 }
+
+.mode-btn.selected{border-color:var(--accent);color:var(--accent);background:color-mix(in srgb,var(--accent) 8%,transparent)}

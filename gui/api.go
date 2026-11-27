@@ -49,22 +49,26 @@ type platformInfo struct {
 }
 
 type actionRequest struct {
-	Action            string `json:"action"`
-	Value             string `json:"value"`
-	Key               string `json:"key"`
-	Format            string `json:"format"`
-	Confirm           string `json:"confirm"`
-	Minutes           int    `json:"minutes"`
-	Text              string `json:"text"`
-	ID                int64  `json:"id"`
-	Language          string `json:"language"`
-	Days              int    `json:"days"`
-	Enabled           *bool  `json:"enabled"`
-	ThresholdMinutes  *int   `json:"thresholdMinutes"`
-	TrackWhileIdle    *bool  `json:"trackWhileIdle"`
-	TrackWhilePlaying *bool  `json:"trackWhilePlaying"`
-	RedactTitles      *bool  `json:"redactTitles"`
-	Dark              *bool  `json:"dark"`
+	Action            string   `json:"action"`
+	Value             string   `json:"value"`
+	Key               string   `json:"key"`
+	Format            string   `json:"format"`
+	Confirm           string   `json:"confirm"`
+	Minutes           int      `json:"minutes"`
+	Text              string   `json:"text"`
+	ID                int64    `json:"id"`
+	Language          string   `json:"language"`
+	Mode              string   `json:"mode"`
+	MaxOpens          int      `json:"maxOpens"`
+	MinutesPerOpen    int      `json:"minutesPerOpen"`
+	Allowlist         []string `json:"allowlist"`
+	Days              int      `json:"days"`
+	Enabled           *bool    `json:"enabled"`
+	ThresholdMinutes  *int     `json:"thresholdMinutes"`
+	TrackWhileIdle    *bool    `json:"trackWhileIdle"`
+	TrackWhilePlaying *bool    `json:"trackWhilePlaying"`
+	RedactTitles      *bool    `json:"redactTitles"`
+	Dark              *bool    `json:"dark"`
 }
 
 type actionResponse struct {
@@ -166,12 +170,15 @@ func (a *app) limits(w http.ResponseWriter, r *http.Request) error {
 	events, _ := storage.ListBlockEvents(30)
 	blocked, bypassed := storage.BlockStatsToday()
 	return writeJSON(w, map[string]interface{}{
-		"limits":        entries,
-		"suggestions":   limitSuggestions(),
-		"sites":         buildSiteLimitEntries(),
-		"events":        events,
-		"blockedToday":  blocked,
-		"bypassedToday": bypassed,
+		"limits":            entries,
+		"suggestions":       limitSuggestions(),
+		"sites":             buildSiteLimitEntries(),
+		"events":            events,
+		"blockedToday":      blocked,
+		"bypassedToday":     bypassed,
+		"strongWebMode":     system.GetStrongWebMode(),
+		"webAllowlist":      system.GetWebAllowlist(),
+		"extensionBrowsers": extensionBrowsers(),
 	})
 }
 
@@ -318,13 +325,41 @@ func (a *app) runAction(req actionRequest) (actionResponse, error) {
 		if key == "" {
 			return ok, badRequest("an app key is required")
 		}
+		if req.Mode == "opens" {
+			if req.MaxOpens < 1 || req.MaxOpens > 100 {
+				return ok, badRequest("max opens must be between 1 and 100")
+			}
+			if req.MinutesPerOpen < 1 || req.MinutesPerOpen > 1440 {
+				return ok, badRequest("minutes per open must be between 1 and 1440")
+			}
+			if err := system.SetAppOpenLimit(key, req.MaxOpens, req.MinutesPerOpen); err != nil {
+				return ok, err
+			}
+			return ok, system.SetAppTimeLimit(key, 0)
+		}
 		if req.Minutes < 1 || req.Minutes > 1440 {
 			return ok, badRequest("limit must be between 1 and 1440 minutes")
+		}
+		if err := system.SetAppOpenLimit(key, 0, 0); err != nil {
+			return ok, err
 		}
 		return ok, system.SetAppTimeLimit(key, req.Minutes)
 
 	case "limit-delete":
-		return ok, system.SetAppTimeLimit(strings.TrimSpace(req.Key), 0)
+		key := strings.TrimSpace(req.Key)
+		if err := system.SetAppTimeLimit(key, 0); err != nil {
+			return ok, err
+		}
+		return ok, system.SetAppOpenLimit(key, 0, 0)
+
+	case "strong-web":
+		if req.Enabled == nil {
+			return ok, badRequest("enabled is required")
+		}
+		return ok, system.SetStrongWebMode(*req.Enabled)
+
+	case "web-allowlist":
+		return ok, system.SetWebAllowlist(req.Allowlist)
 
 	case "language":
 		return ok, system.SetLanguage(req.Language)

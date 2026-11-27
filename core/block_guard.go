@@ -34,6 +34,14 @@ type blockGuard struct {
 	warned    map[string]bool
 	pending   map[string]time.Time
 	day       string
+	openState map[string]*openLimitState
+}
+
+type openLimitState struct {
+	sessionID int64
+	deadline  time.Time
+	day       string
+	blocked   bool
 }
 
 type activeBlock struct {
@@ -46,18 +54,22 @@ type activeBlock struct {
 	used      int
 	hwnd      uintptr
 	minimize  bool
+	unit      string
+	maxOpens  int
 	startedAt time.Time
 }
 
 type violation struct {
-	kind   string
-	target string
-	label  string
-	limit  int
-	used   int
-	hwnd   uintptr
-	pid    uint32
-	launch bool
+	kind     string
+	target   string
+	label    string
+	limit    int
+	used     int
+	hwnd     uintptr
+	pid      uint32
+	launch   bool
+	unit     string
+	maxOpens int
 }
 
 func (g *blockGuard) stop() {
@@ -99,6 +111,17 @@ func (g *blockGuard) enforce() {
 	defer g.mu.Unlock()
 	g.resetDay(time.Now())
 
+	if g.active == nil || g.active.kind == "app" {
+		g.enforceOpenLimitsLocked(time.Now())
+	}
+
+	// The site blocker sets a short hold while it restores the browser and
+	// closes the site's tabs. Without this, the guard would minimize the
+	// browser again in the middle of that operation.
+	if g.active != nil && g.active.kind == "site" && storage.ActiveBlockHold("site", g.active.target, time.Now()) {
+		return
+	}
+
 	if g.active != nil && storage.ActiveBlockBypass(g.active.kind, g.active.target, time.Now()) {
 		g.closeLocked()
 	}
@@ -122,6 +145,11 @@ func (g *blockGuard) enforce() {
 	if !ok {
 		return
 	}
+	// The blocker may still be closing the site's tabs. Do not reopen the
+	// pause page (or minimize the browser) during that short operation.
+	if v.kind == "site" && storage.ActiveBlockHold("site", v.target, time.Now()) {
+		return
+	}
 	// A bypass is checked here as well as on the active-block path. Otherwise
 	// closing the blocker for a bypass clears active, and the very next tick
 	// reopens it while the target is still in front: the open/close loop.
@@ -133,6 +161,113 @@ func (g *blockGuard) enforce() {
 		return
 	}
 	g.startAppLocked(v)
+}
+
+func (g *blockGuard) enforceOpenLimitsLocked(now time.Time) {
+	limits := system.GetAppOpenLimits()
+	if len(limits) == 0 {
+		return
+	}
+	if g.openState == nil {
+		g.openState = make(map[string]*openLimitState)
+	}
+	for key, st := range g.openState {
+		if _, ok := limits[key]; !ok {
+			if st.sessionID > 0 {
+				_ = storage.CloseAppSession(st.sessionID, now)
+			}
+			delete(g.openState, key)
+		}
+	}
+
+	day := storage.Today()
+	for key, limit := range limits {
+		if limit.MaxOpens <= 0 || limit.MinutesPerOpen <= 0 {
+			continue
+		}
+		exe := system.ExeNameForLimitKey(key)
+		if exe == "" {
+			continue
+		}
+		st := g.openState[key]
+		if st == nil {
+			st = &openLimitState{}
+			if active, err := storage.ActiveAppSession(key); err == nil && active != nil {
+				st.sessionID = active.ID
+				st.deadline = time.Unix(active.Deadline, 0)
+				st.day = active.Date
+			}
+			g.openState[key] = st
+		}
+
+		running := system.GetProcessCount(exe) > 0
+		if !running {
+			if st.sessionID > 0 {
+				_ = storage.CloseAppSession(st.sessionID, now)
+			}
+			st.sessionID = 0
+			st.deadline = time.Time{}
+			st.day = ""
+			st.blocked = false
+			continue
+		}
+		if st.sessionID > 0 && (st.day == "" || st.day != day) {
+			_ = storage.CloseAppSession(st.sessionID, now)
+			st.sessionID = 0
+			st.deadline = time.Time{}
+			st.blocked = false
+		}
+
+		label := system.ResolveDisplayName("", exe, "")
+		if st.sessionID == 0 {
+			if storage.ActiveBlockBypass("app", key, now) {
+				continue
+			}
+			opens := storage.CountAppOpens(day, key)
+			if opens >= limit.MaxOpens {
+				st.blocked = true
+				if g.active == nil {
+					g.startAppLocked(violation{
+						kind: "app", target: key, label: label,
+						limit: limit.MaxOpens, used: opens,
+						pid: system.FirstPIDForExe(exe), unit: "opens",
+						maxOpens: limit.MaxOpens,
+					})
+				}
+				continue
+			}
+			id, err := storage.OpenAppSession(day, key, exe, now, limit.MinutesPerOpen)
+			if err != nil {
+				continue
+			}
+			st.sessionID = id
+			st.deadline = now.Add(time.Duration(limit.MinutesPerOpen) * time.Minute)
+			st.day = day
+			st.blocked = false
+			continue
+		}
+
+		if storage.ActiveBlockBypass("app", key, now) {
+			if st.blocked {
+				until := now.Add(10 * time.Minute)
+				_ = storage.UpdateAppSessionDeadline(st.sessionID, until, limit.MinutesPerOpen)
+				st.deadline = until
+				st.blocked = false
+			}
+			continue
+		}
+		if now.After(st.deadline) && !st.blocked {
+			st.blocked = true
+			if g.active == nil {
+				g.startAppLocked(violation{
+					kind: "app", target: key, label: label,
+					limit: limit.MinutesPerOpen, used: limit.MinutesPerOpen * 60,
+					pid: system.FirstPIDForExe(exe), unit: "minutes",
+					maxOpens: limit.MaxOpens,
+				})
+			}
+		}
+	}
 }
 
 func (g *blockGuard) enforceAppLocked(fg *system.WindowInfo) {
@@ -147,7 +282,7 @@ func (g *blockGuard) enforceAppLocked(fg *system.WindowInfo) {
 	if system.TargetAlive(g.active.hwnd, g.active.pid) {
 		if g.active.cmd == nil || !system.ProcessRunning(uint32(g.active.cmd.Process.Pid)) {
 			if time.Now().After(g.nextSpawn) {
-				if err := g.spawn(g.active.kind, g.active.target, g.active.label, g.active.limit, g.active.used, g.active.hwnd, g.active.pid); err != nil {
+				if err := g.spawn(g.active.kind, g.active.target, g.active.label, g.active.limit, g.active.used, g.active.hwnd, g.active.pid, g.active.unit, g.active.maxOpens); err != nil {
 					g.nextSpawn = time.Now().Add(3 * time.Second)
 				}
 			}
@@ -176,7 +311,7 @@ func (g *blockGuard) enforceSiteLocked(fg *system.WindowInfo) {
 	system.MinimizeWindow(v.hwnd)
 	if g.active.cmd == nil || !system.ProcessRunning(uint32(g.active.cmd.Process.Pid)) {
 		if time.Now().After(g.nextSpawn) {
-			if err := g.spawn(g.active.kind, g.active.target, g.active.label, v.limit, v.used, v.hwnd, v.pid); err != nil {
+			if err := g.spawn(g.active.kind, g.active.target, g.active.label, v.limit, v.used, v.hwnd, v.pid, v.unit, v.maxOpens); err != nil {
 				g.nextSpawn = time.Now().Add(3 * time.Second)
 			}
 		}
@@ -196,16 +331,23 @@ func (g *blockGuard) startAppLocked(v violation) {
 	if v.launch {
 		system.MinimizeWindow(v.hwnd)
 	}
-	if err := g.spawn(v.kind, v.target, v.label, v.limit, v.used, v.hwnd, v.pid); err != nil {
+	unit := v.unit
+	if unit == "" {
+		unit = "minutes"
+	}
+	if err := g.spawn(v.kind, v.target, v.label, v.limit, v.used, v.hwnd, v.pid, unit, v.maxOpens); err != nil {
 		log.Printf("WARN: could not open blocker: %v", err)
 		g.nextSpawn = time.Now().Add(3 * time.Second)
 		return
 	}
-	g.active = &activeBlock{kind: v.kind, target: v.target, label: v.label, cmd: g.lastCmd, pid: v.pid, limit: v.limit, used: v.used, hwnd: v.hwnd, minimize: v.launch}
+	g.active = &activeBlock{kind: v.kind, target: v.target, label: v.label, cmd: g.lastCmd, pid: v.pid, limit: v.limit, used: v.used, hwnd: v.hwnd, minimize: v.launch, unit: unit, maxOpens: v.maxOpens}
 }
 
 func (g *blockGuard) startSiteLocked(v violation) {
 	if time.Now().Before(g.nextSpawn) {
+		return
+	}
+	if storage.ActiveBlockHold("site", v.target, time.Now()) {
 		return
 	}
 	if storage.ActiveBlockBypass(v.kind, v.target, time.Now()) {
@@ -225,19 +367,39 @@ func (g *blockGuard) startSiteLocked(v violation) {
 		_ = storage.RecordBlockEvent(v.kind, v.label, "blocked", v.limit, v.used, "")
 	}
 	system.MinimizeWindow(v.hwnd)
-	if err := g.spawn(v.kind, v.target, v.label, v.limit, v.used, v.hwnd, v.pid); err != nil {
+	if err := g.spawn(v.kind, v.target, v.label, v.limit, v.used, v.hwnd, v.pid, "minutes", 0); err != nil {
 		log.Printf("WARN: could not open blocker: %v", err)
 		g.nextSpawn = time.Now().Add(3 * time.Second)
 		return
 	}
-	g.active = &activeBlock{kind: v.kind, target: v.target, label: v.label, cmd: g.lastCmd, pid: v.pid, limit: v.limit, used: v.used, hwnd: v.hwnd}
+	g.active = &activeBlock{kind: v.kind, target: v.target, label: v.label, cmd: g.lastCmd, pid: v.pid, limit: v.limit, used: v.used, hwnd: v.hwnd, unit: "minutes"}
+}
+
+func extensionBrowserForExe(exe string) string {
+	switch strings.ToLower(exe) {
+	case "msedge.exe":
+		return "edge"
+	case "firefox.exe":
+		return "firefox"
+	case "brave.exe":
+		return "brave"
+	case "chrome.exe", "chromium.exe", "thorium.exe":
+		return "chrome"
+	}
+	return ""
+}
+
+func extensionHandlesBrowser(exe string) bool {
+	browser := extensionBrowserForExe(exe)
+	return browser != "" && storage.ExtensionSeen(browser, 90*time.Second)
 }
 
 func (g *blockGuard) warnNearLimit(fg *system.WindowInfo) {
+
 	if fg == nil || system.IsWhitelisted(fg.ExeName) {
 		return
 	}
-	if system.IsBrowser(fg.ExeName) {
+	if system.IsBrowser(fg.ExeName) && !extensionHandlesBrowser(fg.ExeName) {
 		class := coreapi.SiteClassForTitle(fg.Title)
 		if minutes, ok := system.GetSiteTimeLimits()[class]; ok && minutes > 0 {
 			used := coreapi.SiteUsageTodaySeconds(class)
@@ -268,7 +430,7 @@ func (g *blockGuard) warnIfTwenty(key string, used, limit int, label string) {
 	showNotification(notifyContext, tr("Time allowance", "使用额度提醒"), fmt.Sprintf(tr("%s has %d minutes left.", "%s 还剩 %d 分钟。"), label, (remaining+59)/60))
 }
 
-func (g *blockGuard) spawn(kind, target, label string, limit, used int, hwnd uintptr, pid uint32) error {
+func (g *blockGuard) spawn(kind, target, label string, limit, used int, hwnd uintptr, pid uint32, unit string, maxOpens int) error {
 	gui := guiExecutablePath()
 	if gui == "" {
 		return os.ErrNotExist
@@ -282,6 +444,8 @@ func (g *blockGuard) spawn(kind, target, label string, limit, used int, hwnd uin
 		"--used", strconv.Itoa(used),
 		"--hwnd", strconv.FormatUint(uint64(hwnd), 10),
 		"--pid", strconv.FormatUint(uint64(pid), 10),
+		"--unit", unit,
+		"--max-opens", strconv.Itoa(maxOpens),
 	)
 	cmd.SysProcAttr = &syscall.SysProcAttr{HideWindow: false}
 	if err := cmd.Start(); err != nil {
@@ -317,13 +481,13 @@ func (g *blockGuard) violationFor(fg *system.WindowInfo) (violation, bool) {
 		return violation{}, false
 	}
 
-	if system.IsBrowser(fg.ExeName) {
+	if system.IsBrowser(fg.ExeName) && !extensionHandlesBrowser(fg.ExeName) {
 		class := coreapi.SiteClassForTitle(fg.Title)
 		if class != "" {
 			if minutes, ok := system.GetSiteTimeLimits()[class]; ok && minutes > 0 {
 				used := coreapi.SiteUsageTodaySeconds(class)
 				if used >= minutes*60 {
-					return violation{"site", class, coreapi.SiteClassDisplay(class), minutes, used, fg.HWND, fg.PID, false}, true
+					return violation{kind: "site", target: class, label: coreapi.SiteClassDisplay(class), limit: minutes, used: used, hwnd: fg.HWND, pid: fg.PID, unit: "minutes"}, true
 				}
 			}
 		}
@@ -338,7 +502,7 @@ func (g *blockGuard) violationFor(fg *system.WindowInfo) (violation, bool) {
 				label := system.ResolveDisplayName(fg.AppID, fg.ExeName, "")
 				age := system.ProcessAge(fg.PID)
 				launch := age > 0 && age < 20*time.Second
-				return violation{"app", key, label, minutes, used, fg.HWND, fg.PID, launch}, true
+				return violation{kind: "app", target: key, label: label, limit: minutes, used: used, hwnd: fg.HWND, pid: fg.PID, launch: launch, unit: "minutes"}, true
 			}
 		}
 	}
