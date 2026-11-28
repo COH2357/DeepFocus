@@ -19,7 +19,7 @@
   $("siteLabel").textContent = label;
   $("used").textContent = limit > 0 ? fmt(used) : "—";
   $("limit").textContent = limit > 0 ? "上限 " + fmt(limit * 60) : "强力监管";
-  $("mode").textContent = reason === "limit" ? "已超出今日额度" : "需要说明理由";
+  $("mode").textContent = reason === "strong" && remaining <= 0 ? "已超出今日额度" : (reason === "limit" ? "已超出今日额度" : "需要说明理由");
   const pct = limit > 0 ? Math.min(100, Math.round((used / (limit * 60)) * 100)) : 100;
   const bar = $("bar");
   bar.style.width = Math.max(4, pct) + "%";
@@ -41,8 +41,13 @@
     $("lede").textContent = "这个网站今天的额度已经用完。说明用途后可以临时放行，记录会保存在本地。";
     $("kicker").textContent = "网站额度已到";
   } else if (reason === "strong") {
-    $("lede").textContent = "这个网站今天的额度已经用完。强力监管要求说明用途并选择放行时长。";
-    $("kicker").textContent = "额度已用完";
+    if (remaining > 0) {
+      $("lede").textContent = "强力监管要求进入这个网站前说明用途并选择放行时长；本次仍可使用今日剩余的正常额度。";
+      $("kicker").textContent = "访问前确认";
+    } else {
+      $("lede").textContent = "这个网站今天的额度已经用完。强力监管要求说明用途并选择放行时长。";
+      $("kicker").textContent = "额度已用完";
+    }
   }
 
   let selected = 15;
