@@ -5,6 +5,7 @@
   const reason = params.get("reason") || "strong";
   const used = Number(params.get("used") || 0);
   const limit = Number(params.get("limit") || 0);
+  const remaining = Number(params.get("remaining") || 0);
   const original = params.get("url") || "";
   const unavailable = params.get("unavailable") === "1";
   const minutes = [5, 15, 30, 60];
@@ -48,6 +49,20 @@
   const reasonEl = $("reason");
   const grant = $("grant");
   const custom = $("customMinutes");
+  const updateRemaining = () => {
+    const el = $("remaining");
+    const maxNormal = Math.floor(remaining / 60);
+    if (maxNormal <= 0) {
+      el.textContent = "今日正常额度已用完；本次放行将记为一次违反。";
+      el.classList.add("over");
+    } else if (selected > maxNormal) {
+      el.textContent = "本次最多可正常放行 " + maxNormal + " 分钟；当前选择超出额度，放行将记为一次违反。";
+      el.classList.add("over");
+    } else {
+      el.textContent = "今日最多还可正常放行 " + maxNormal + " 分钟；超出部分记为一次违反。";
+      el.classList.remove("over");
+    }
+  };
   const refresh = () => {
     grant.disabled = reasonEl.value.trim().length < 2;
   };
@@ -58,6 +73,7 @@
       selected = Number(button.dataset.minutes) || 15;
       custom.value = "";
       document.querySelectorAll("[data-minutes]").forEach((b) => b.classList.toggle("active", b === button));
+      updateRemaining();
     });
   });
   custom.addEventListener("input", () => {
@@ -65,9 +81,11 @@
     if (minutes >= 1 && minutes <= 1440) {
       selected = minutes;
       document.querySelectorAll("[data-minutes]").forEach((b) => b.classList.remove("active"));
+      updateRemaining();
     }
   });
   refresh();
+  updateRemaining();
 
   const toast = (text, error) => {
     const el = $("toast");

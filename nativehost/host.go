@@ -21,32 +21,34 @@ import (
 const extensionID = "jkepdhaoafljfalimepgfohpgfmfmmbk"
 
 type request struct {
-	Type    string `json:"type"`
-	Browser string `json:"browser"`
-	URL     string `json:"url"`
-	Site    string `json:"site"`
-	Minutes int    `json:"minutes"`
-	Reason  string `json:"reason"`
-	Version string `json:"version"`
-	TabID   int    `json:"tabId"`
+	Type        string `json:"type"`
+	Browser     string `json:"browser"`
+	URL         string `json:"url"`
+	Site        string `json:"site"`
+	Minutes     int    `json:"minutes"`
+	Reason      string `json:"reason"`
+	Version     string `json:"version"`
+	TabID       int    `json:"tabId"`
+	WithinLimit bool   `json:"withinLimit"`
 }
 
 type response struct {
-	OK          bool            `json:"ok"`
-	Error       string          `json:"error,omitempty"`
-	Action      string          `json:"action,omitempty"`
-	Site        string          `json:"site,omitempty"`
-	Label       string          `json:"label,omitempty"`
-	Reason      string          `json:"reason,omitempty"`
-	UsedSeconds int             `json:"usedSeconds,omitempty"`
-	LimitMinute int             `json:"limitMinutes,omitempty"`
-	Until       int64           `json:"until,omitempty"`
-	Config      *configResponse `json:"config,omitempty"`
+	OK               bool            `json:"ok"`
+	Error            string          `json:"error,omitempty"`
+	Action           string          `json:"action,omitempty"`
+	Site             string          `json:"site,omitempty"`
+	Label            string          `json:"label,omitempty"`
+	Reason           string          `json:"reason,omitempty"`
+	UsedSeconds      int             `json:"usedSeconds,omitempty"`
+	LimitMinute      int             `json:"limitMinutes,omitempty"`
+	RemainingSeconds int             `json:"remainingSeconds,omitempty"`
+	WithinLimit      bool            `json:"withinLimit,omitempty"`
+	Until            int64           `json:"until,omitempty"`
+	Config           *configResponse `json:"config,omitempty"`
 }
 
 type configResponse struct {
 	StrongMode bool           `json:"strongMode"`
-	Allowlist  []string       `json:"allowlist"`
 	SiteLimits map[string]int `json:"siteLimits"`
 	Version    string         `json:"version"`
 	Extension  string         `json:"extensionId"`
@@ -115,11 +117,14 @@ func handle(req request) response {
 	if req.Browser == "" {
 		req.Browser = "chrome"
 	}
-	if req.Type != "navigation" && req.Type != "heartbeat" && req.Type != "hello" && req.Type != "request_access" && req.Type != "status" {
+	if req.Type != "navigation" && req.Type != "heartbeat" && req.Type != "hello" && req.Type != "request_access" && req.Type != "allowance_ended" && req.Type != "status" {
 		return response{OK: false, Error: "unknown message type"}
 	}
 	if req.Type == "request_access" {
 		return grant(req)
+	}
+	if req.Type == "allowance_ended" {
+		return allowanceEnded(req)
 	}
 	_ = storage.SetExtensionSeen(strings.ToLower(req.Browser), req.Version, time.Now())
 	if req.Type == "hello" || req.Type == "heartbeat" || req.Type == "status" {
@@ -131,7 +136,6 @@ func handle(req request) response {
 func currentConfig(browser string) *configResponse {
 	return &configResponse{
 		StrongMode: system.GetStrongWebMode(),
-		Allowlist:  system.GetWebAllowlist(),
 		SiteLimits: system.GetSiteTimeLimits(),
 		Version:    "1",
 		Extension:  extensionID,
@@ -154,15 +158,43 @@ func grant(req request) response {
 		return response{OK: false, Error: "a site is required"}
 	}
 	now := time.Now()
+	limit := system.GetSiteTimeLimits()[site]
+	used := coreapi.SiteUsageTodaySeconds(site)
+	remaining := 0
+	if limit > 0 {
+		remaining = limit*60 - used
+		if remaining < 0 {
+			remaining = 0
+		}
+	}
+	withinLimit := limit > 0 && req.Minutes*60 <= remaining
 	until := now.Add(time.Duration(req.Minutes) * time.Minute)
 	if err := storage.SetSiteAllowance(site, until, reason); err != nil {
 		return response{OK: false, Error: err.Error()}
 	}
+	if !withinLimit {
+		_ = storage.RecordBlockEvent("site", coreapi.SiteClassDisplay(site), "bypassed", limit, used, reason)
+	}
+	_ = storage.SetExtensionSeen(strings.ToLower(req.Browser), req.Version, now)
+	return response{
+		OK: true, Site: site, Until: until.Unix(),
+		UsedSeconds: used, LimitMinute: limit,
+		RemainingSeconds: remaining, WithinLimit: withinLimit,
+	}
+}
+
+func allowanceEnded(req request) response {
+	if !req.WithinLimit {
+		return response{OK: true}
+	}
+	site := strings.ToLower(strings.TrimSpace(req.Site))
+	if site == "" {
+		return response{OK: true}
+	}
 	limit := system.GetSiteTimeLimits()[site]
 	used := coreapi.SiteUsageTodaySeconds(site)
-	_ = storage.RecordBlockEvent("site", coreapi.SiteClassDisplay(site), "bypassed", limit, used, reason)
-	_ = storage.SetExtensionSeen(strings.ToLower(req.Browser), req.Version, now)
-	return response{OK: true, Site: site, Until: until.Unix()}
+	_ = storage.RecordBlockEvent("site", coreapi.SiteClassDisplay(site), "used", limit, used, "")
+	return response{OK: true}
 }
 
 func decide(req request) response {
@@ -185,9 +217,6 @@ func decide(req request) response {
 	if site == "" {
 		return response{OK: true, Action: "allow"}
 	}
-	if isAllowlisted(host, site) {
-		return response{OK: true, Action: "allow"}
-	}
 	now := time.Now()
 	if _, ok := storage.SiteAllowanceUntil(site, now); ok {
 		return response{OK: true, Action: "allow"}
@@ -195,36 +224,24 @@ func decide(req request) response {
 	limits := system.GetSiteTimeLimits()
 	limit, limited := limits[site]
 	if !limited || limit <= 0 {
-		// Strong mode only governs sites the user explicitly added to the
-		// website-limit list. Everything else is ordinary browsing.
+		// Blacklist policy: only sites the user explicitly added can be
+		// supervised; everything else is ordinary browsing.
 		return response{OK: true, Action: "allow"}
 	}
 	used := coreapi.SiteUsageTodaySeconds(site)
-	if used < limit*60 {
-		// Never interrupt a site before its daily allowance is actually used up.
-		return response{OK: true, Action: "allow", Site: site, Label: coreapi.SiteClassDisplay(site), UsedSeconds: used, LimitMinute: limit}
+	remaining := limit*60 - used
+	if remaining < 0 {
+		remaining = 0
 	}
-	reason := "limit"
 	if system.GetStrongWebMode() {
-		reason = "strong"
+		// Strong mode intercepts every entry to a blacklisted site, even while
+		// daily allowance remains, so the user must state intent and time.
+		return response{OK: true, Action: "block", Site: site, Label: coreapi.SiteClassDisplay(site), Reason: "strong", UsedSeconds: used, LimitMinute: limit, RemainingSeconds: remaining}
 	}
-	return response{OK: true, Action: "block", Site: site, Label: coreapi.SiteClassDisplay(site), Reason: reason, UsedSeconds: used, LimitMinute: limit}
-}
-
-func isAllowlisted(host, site string) bool {
-	for _, entry := range system.GetWebAllowlist() {
-		entry = strings.ToLower(strings.TrimSpace(entry))
-		if entry == "" {
-			continue
-		}
-		if host == entry || strings.HasSuffix(host, "."+entry) {
-			return true
-		}
-		if site == entry {
-			return true
-		}
+	if used >= limit*60 {
+		return response{OK: true, Action: "block", Site: site, Label: coreapi.SiteClassDisplay(site), Reason: "limit", UsedSeconds: used, LimitMinute: limit, RemainingSeconds: 0}
 	}
-	return false
+	return response{OK: true, Action: "allow", Site: site, Label: coreapi.SiteClassDisplay(site), UsedSeconds: used, LimitMinute: limit, RemainingSeconds: remaining}
 }
 
 func siteFromURL(raw string) string {

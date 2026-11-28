@@ -31,6 +31,7 @@ function blockURL(reply, url) {
   block.searchParams.set("reason", reply.reason || "strong");
   block.searchParams.set("used", String(reply.usedSeconds || 0));
   block.searchParams.set("limit", String(reply.limitMinutes || 0));
+  block.searchParams.set("remaining", String(reply.remainingSeconds || 0));
   block.searchParams.set("url", url);
   return block.toString();
 }
@@ -48,10 +49,10 @@ async function saveAllowances(allowances) {
   await chrome.storage.local.set({ [ALLOWANCE_KEY]: allowances });
 }
 
-async function rememberAllowance(site, until) {
+async function rememberAllowance(site, until, minutes, withinLimit) {
   if (!site || !until) return;
   const allowances = await loadAllowances();
-  allowances[site] = until;
+  allowances[site] = { until: Number(until), minutes: Number(minutes) || 0, withinLimit: !!withinLimit };
   await saveAllowances(allowances);
   await scheduleAllowanceCheck();
 }
@@ -59,13 +60,13 @@ async function rememberAllowance(site, until) {
 async function scheduleAllowanceCheck() {
   const allowances = await loadAllowances();
   const now = Math.floor(Date.now() / 1000);
-  const future = Object.values(allowances).filter((until) => Number(until) > now);
+  const future = Object.values(allowances).filter((entry) => Number(entry.until) > now);
   if (!future.length) {
     await chrome.alarms.clear(ALLOWANCE_EXPIRY);
     await chrome.alarms.clear(ALLOWANCE_POLL);
     return;
   }
-  const next = Math.min(...future.map(Number));
+  const next = Math.min(...future.map((entry) => Number(entry.until)));
   chrome.alarms.create(ALLOWANCE_EXPIRY, { when: Math.max(Date.now() + 1000, next * 1000 + 500) });
   // A periodic sweep also catches a disabled laptop waking after the deadline.
   chrome.alarms.create(ALLOWANCE_POLL, { periodInMinutes: 0.5 });
@@ -75,6 +76,22 @@ async function checkAllowances() {
   const allowances = await loadAllowances();
   const now = Math.floor(Date.now() / 1000);
   if (!Object.keys(allowances).length) return;
+  const remaining = {};
+  for (const [site, entry] of Object.entries(allowances)) {
+    if (Number(entry.until) > now) {
+      remaining[site] = entry;
+      continue;
+    }
+    await nativeMessage({
+      type: "allowance_ended",
+      browser,
+      version: "0.1.2",
+      site,
+      minutes: Number(entry.minutes) || 0,
+      withinLimit: !!entry.withinLimit
+    });
+  }
+  await saveAllowances(remaining);
   const tabs = await chrome.tabs.query({ url: ["http://*/*", "https://*/*"] });
   for (const tab of tabs) {
     if (!tab.id || !tab.url) continue;
@@ -89,11 +106,6 @@ async function checkAllowances() {
       redirectToBlock(tab.id, reply, tab.url);
     }
   }
-  const remaining = {};
-  for (const [site, until] of Object.entries(allowances)) {
-    if (Number(until) > now) remaining[site] = until;
-  }
-  await saveAllowances(remaining);
   await scheduleAllowanceCheck();
 }
 
@@ -144,7 +156,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     minutes: Number(message.minutes) || 0,
     reason: message.reason || ""
   }).then((reply) => {
-    if (reply && reply.ok && reply.until) rememberAllowance(reply.site, reply.until).catch(() => {});
+    if (reply && reply.ok && reply.until) rememberAllowance(reply.site, reply.until, message.minutes, reply.withinLimit).catch(() => {});
     sendResponse(reply || { ok: false, error: "DeepFocus 服务未运行" });
   });
   return true;

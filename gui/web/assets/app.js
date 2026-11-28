@@ -1073,7 +1073,7 @@
 
     const events = data.events || [];
     const eventRows = events.slice(0, 12).map(function (e) {
-      const action = e.action === "bypassed" ? t("limits.eventBypassed") : t("limits.eventBlocked");
+      const action = e.action === "bypassed" ? t("limits.eventBypassed") : (e.action === "used" ? t("limits.eventUsed") : t("limits.eventBlocked"));
       return '<div class="event-row"><span class="event-time">' + esc(fmtDateShort(e.date)) + " " + esc(fmtTime(e.time)) + "</span>" +
         '<span class="event-action ' + esc(e.action) + '">' + esc(action) + "</span>" +
         "<b>" + esc(e.target) + "</b>" +
@@ -1260,7 +1260,7 @@
 
     const experimental = '<div class="card experimental-card"><div class="card-head"><div><div class="card-title">' + icon("globe") + esc(t("settings.experimental")) +
       ' <span class="badge">beta</span></div>' +
-      '<div class="card-sub">' + esc(t("settings.domainGroupingHint")) + "</div></div></div>" +
+      '<div class="card-sub">' + esc(s.extensionActive ? t("settings.domainGroupingExt") : t("settings.domainGroupingHint")) + "</div></div></div>" +
       '<div class="setting-row"><div class="setting-text"><b>' + esc(t("settings.domainGrouping")) + "</b><span>" + esc(t("settings.domainGroupingDesc")) + "</span></div>" +
       '<div class="setting-control">' + switchHTML(!!s.domainGrouping, "domain-grouping") + "</div></div></div>";
 
@@ -1271,10 +1271,7 @@
       '<div class="setting-row"><div class="setting-text"><b>' + esc(t("settings.extensionStatus")) + "</b><span>" +
         esc(s.extensionActive ? t("settings.extensionConnected", { browsers: (s.extensionBrowsers || []).join(", ") }) : t("settings.extensionMissing")) + "</span></div>" +
         '<div class="setting-control"><span class="status-pill ' + (s.extensionActive ? "" : "warn") + '">' + esc(s.extensionActive ? t("settings.extensionOn") : t("settings.extensionOff")) + "</span></div></div>" +
-      '<div class="setting-row" style="display:block"><div class="setting-text" style="margin-bottom:6px"><b>' + esc(t("settings.webAllowlist")) + "</b><span>" + esc(t("settings.webAllowlistDesc")) + "</span></div>" +
-        '<div class="chips">' + chipsHTML(s.webAllowlist, "remove-web-allow", t("settings.webAllowlistEmpty")) + "</div>" +
-        '<form class="chip-add" data-form="web-allowlist"><input class="input" name="value" placeholder="google.com" autocomplete="off"><button class="btn btn-sm" type="submit">' + esc(t("settings.addAllow")) + "</button></form>" +
-        '<p class="hint faint" style="font-size:10.5px;margin:8px 0 0">' + esc(t("settings.extensionHint")) + "</p></div></div>";
+      '<p class="hint faint" style="font-size:10.5px;margin:8px 0 0">' + esc(t("settings.extensionHint")) + "</p></div>";
 
 
       '<div class="setting-row"><div class="setting-text"><b>' + esc(t("settings.breakReminder")) + "</b><span>" + esc(t("focus.breakDesc")) + "</span></div>" +
@@ -1560,13 +1557,6 @@
           render();
         });
         break;
-      case "remove-web-allow": {
-        const list = (state.settings.webAllowlist || []).filter(function (v) { return v !== node.dataset.value; });
-        await act("web-allowlist", { allowlist: list });
-        await loadSettings();
-        render();
-        break;
-      }
       case "quotes":
         openQuotesModal();
         break;
@@ -1905,22 +1895,6 @@
         toast(t("limits.addedToast"));
         await loadLimits();
         render();
-      } catch (err) {
-        toastError(err);
-      }
-      return;
-    }
-    if (kind === "web-allowlist") {
-      const value = form.elements.value.value.trim();
-      if (!value) return;
-      const list = (state.settings.webAllowlist || []).slice();
-      if (list.indexOf(value) < 0) list.push(value);
-      try {
-        await act("web-allowlist", { allowlist: list });
-        form.reset();
-        await loadSettings();
-        render();
-        toast(t("settings.saved"));
       } catch (err) {
         toastError(err);
       }
