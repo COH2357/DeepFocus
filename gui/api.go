@@ -7,6 +7,7 @@ import (
 	"focusd/storage"
 	"focusd/system"
 	"net/http"
+	"os"
 	"strconv"
 	"strings"
 	"time"
@@ -78,6 +79,7 @@ type actionResponse struct {
 	Path         string `json:"path,omitempty"`
 	Running      bool   `json:"running,omitempty"`
 	ArchiveCount int    `json:"archiveCount,omitempty"`
+	Latest       string `json:"latest,omitempty"`
 }
 
 func (a *app) bootstrap(w http.ResponseWriter, r *http.Request) error {
@@ -196,6 +198,14 @@ func (a *app) quotes(w http.ResponseWriter, r *http.Request) error {
 
 func (a *app) pomodoro(w http.ResponseWriter, r *http.Request) error {
 	return writeJSON(w, readPomodoro())
+}
+
+func (a *app) updateInfo(w http.ResponseWriter, r *http.Request) error {
+	info, err := system.CheckLatestRelease(a.version)
+	if err != nil {
+		return writeJSON(w, map[string]interface{}{"available": false, "current": a.version, "error": err.Error()})
+	}
+	return writeJSON(w, info)
 }
 
 func readPomodoro() pomodoroData {
@@ -493,8 +503,49 @@ func (a *app) runAction(req actionRequest) (actionResponse, error) {
 	case "open-data-folder":
 		return ok, openDataFolder()
 
-	case "update":
-		return ok, openReleasesPage()
+	case "download-update":
+		info, err := system.CheckLatestRelease(a.version)
+		if err != nil {
+			return ok, err
+		}
+		if !info.Available {
+			return ok, badRequest("DeepFocus is already up to date")
+		}
+		path, err := system.DownloadRelease(info)
+		if err != nil {
+			return ok, err
+		}
+		ok.Path = path
+		return ok, nil
+
+	case "install-update":
+		info, err := system.CheckLatestRelease(a.version)
+		if err != nil {
+			return ok, err
+		}
+		if !info.Available {
+			return ok, badRequest("DeepFocus is already up to date")
+		}
+		path, err := system.DownloadRelease(info)
+		if err != nil {
+			return ok, err
+		}
+		if err := system.LaunchInstaller(path); err != nil {
+			return ok, err
+		}
+		ok.Latest = info.Latest
+		go func() {
+			time.Sleep(1500 * time.Millisecond)
+			os.Exit(0)
+		}()
+		return ok, nil
+
+	case "extension-reloaded":
+		a.extensionReload = false
+		return ok, storage.SetConfig("extension_reload_pending", "0")
+
+	case "open-extension":
+		return ok, openExtensionFolder()
 
 	case "theme":
 		if req.Dark == nil {

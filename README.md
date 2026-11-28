@@ -138,8 +138,8 @@ Retention is on by default: rows older than the configured window (7 days by def
 ### Data export
 Export tracking data to CSV or JSON from Settings in the desktop app or the TUI. Files are saved to `%USERPROFILE%\Downloads`. You can also open the SQLite database directly at `%APPDATA%\focusd\focusd.db`.
 
-### Updates are manual by design
-DeepFocus never downloads or runs an installer on its own. `deepfocus update` (and the Settings button) simply opens the project's GitHub **releases page** in your browser. You choose whether to download a build, and the installer is per-user, so no elevation prompt appears.
+### Updates
+The desktop app checks the latest GitHub release on launch, downloads the installer automatically in the background, verifies its published SHA-256 checksum, and offers a one-click **Download & install** action. The silent per-user NSIS installer replaces program files (keeping the database/config) and relaunches DeepFocus. The CLI `deepfocus update` still opens the releases page for manual choice.
 
 > **Verification.** Each release publishes `checksums.txt`. Compare the SHA-256 of a downloaded file with the published value before running it. Releases are currently unsigned, so Windows SmartScreen may show an "unknown publisher" prompt.
 
@@ -295,9 +295,9 @@ Indexes: `idx_sessions_date`, `idx_sessions_start`, `idx_apps_daily_date`.
 
 DeepFocus is built for privacy by design:
 
-- **No telemetry, no update pings.** `deepfocus update` only asks Windows to open the releases page in your browser; the app itself never contacts GitHub. Grep for `http.` if you don't believe it.
+- **No telemetry.** The only outbound request is the optional GitHub release check used by the updater; it sends no usage data. CLI `deepfocus update` can still open the releases page for manual downloads.
 - **Local-only storage.** All data lives in `%APPDATA%\focusd\focusd.db`. The SQLite file is standard; query it with any SQL tool.
-- **Titles, not URLs.** Browser tracking records the window title only. There is no browser extension, no HTTP interception, no DNS sniffing.
+- **Titles, not URLs for fallback tracking.** Browser tracking normally records the window title; the optional DeepFocus Guard extension adds URL-level navigation checks through a local native-messaging host. There is no DNS sniffing or remote browsing history upload.
 - **Whitelist & pause** give you full control. Whitelisted executables are never recorded; DeepFocus's own binaries and Windows shell surfaces are excluded automatically.
 - **No privilege escalation.** All three binaries and the installer run entirely under your user account; nothing in DeepFocus requests elevation. The install directory, the autostart entry, and the user PATH all live under `%APPDATA%` or HKCU.
 - **Open source.** Full source code available. Audit it yourself.

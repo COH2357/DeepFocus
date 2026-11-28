@@ -18,9 +18,10 @@ import (
 var webFS embed.FS
 
 type app struct {
-	token    string
-	version  string
-	lastSeen atomic.Int64
+	token           string
+	version         string
+	lastSeen        atomic.Int64
+	extensionReload bool
 	// debug keeps the WebView2 context menu and devtools available and prints
 	// the session URL; enabled with FOCUSD_GUI_DEBUG=1.
 	debug bool
@@ -193,6 +194,8 @@ func (a *app) handleAPI(w http.ResponseWriter, r *http.Request) {
 		err = a.settings(w, r)
 	case path == "/api/pomodoro" && r.Method == http.MethodGet:
 		err = a.pomodoro(w, r)
+	case path == "/api/update" && r.Method == http.MethodGet:
+		err = a.updateInfo(w, r)
 	case path == "/api/quotes" && r.Method == http.MethodGet:
 		err = a.quotes(w, r)
 	case path == "/api/actions" && r.Method == http.MethodPost:

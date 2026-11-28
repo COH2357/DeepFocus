@@ -50,6 +50,21 @@
     }
   }
 
+  const quoteEl = $("quote");
+  const rotateQuotes = (list) => {
+    if (!Array.isArray(list) || list.length < 2) return;
+    let index = Math.floor(Math.random() * list.length);
+    const show = () => {
+      quoteEl.textContent = list[index % list.length];
+      index++;
+    };
+    show();
+    setInterval(show, 7000);
+  };
+  chrome.runtime.sendMessage({ type: "get_quotes" }, (reply) => {
+    if (!chrome.runtime.lastError && reply && reply.ok && Array.isArray(reply.quotes)) rotateQuotes(reply.quotes);
+  });
+
   let selected = 15;
   const reasonEl = $("reason");
   const grant = $("grant");

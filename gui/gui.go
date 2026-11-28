@@ -53,7 +53,21 @@ func newApp() *app {
 		debug:   strings.TrimSpace(os.Getenv("FOCUSD_GUI_DEBUG")) == "1",
 	}
 	a.touch()
+	a.prepareVersionNotice()
 	return a
+}
+
+// prepareVersionNotice detects an upgrade or first run and asks the UI to
+// remind the user to reload the browser extension once.
+func (a *app) prepareVersionNotice() {
+	last, _ := storage.GetConfig("last_run_version")
+	pending, _ := storage.GetConfig("extension_reload_pending")
+	a.extensionReload = pending == "1"
+	if last != a.version {
+		a.extensionReload = true
+		_ = storage.SetConfig("extension_reload_pending", "1")
+		_ = storage.SetConfig("last_run_version", a.version)
+	}
 }
 
 // touch marks the page as alive. The browser fallback uses this heartbeat so

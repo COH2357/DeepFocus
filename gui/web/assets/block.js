@@ -100,6 +100,9 @@
         renderQuote();
       }
       if (info.mode === "app") startProcessPolling();
+      // Rotate the quote on its own; the button is only a manual shortcut.
+      clearInterval(state.timer);
+      if (list.length > 1) state.timer = setInterval(nextQuote, 7000);
       window.scrollTo(0, 0);
     } catch (err) {
       showToast(err.message, true);

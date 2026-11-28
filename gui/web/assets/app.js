@@ -25,7 +25,9 @@
     loading: false,
     fatal: null,
     completionAnnounced: false,
-    lastBootstrap: 0
+    lastBootstrap: 0,
+    update: null,
+    updating: false
   };
 
   const $ = (sel, root) => (root || document).querySelector(sel);
@@ -320,6 +322,7 @@
     loadEverything(true).then(function () {
       state.loading = false;
       render();
+      checkUpdate(false);
       tickPomodoro();
     }).catch(function (err) {
       state.loading = false;
@@ -366,6 +369,55 @@
 
   async function loadSettings() {
     state.settings = await api("/api/settings");
+  }
+
+  function renderNotice() {
+    const el = $("#updateNotice");
+    if (!el) return;
+    let html = "";
+    if (state.update && state.update.available) {
+      const status = state.update.downloading ? t("update.downloadingShort") : (state.update.downloaded ? t("update.ready") : t("update.desc"));
+      const action = state.update.downloading
+        ? '<button class="btn btn-primary btn-sm" disabled>' + esc(t("update.downloadingShort")) + "</button>"
+        : '<button class="btn btn-primary btn-sm" data-action="install-update">' + esc(t("update.install")) + "</button>";
+      html = "<div><b>" + esc(t("update.available", { version: state.update.latest })) + "</b> " + esc(status) + "</div>" +
+        '<div class="notice-actions">' + action +
+        '<button class="btn btn-ghost btn-sm" data-action="dismiss-update">' + esc(t("update.later")) + "</button></div>";
+    } else if (state.settings && state.settings.extensionReloadNeeded) {
+      html = "<div><b>" + esc(t("update.extensionTitle")) + "</b> " + esc(t("update.extensionDesc")) + "</div>" +
+        '<div class="notice-actions"><button class="btn btn-sm" data-action="open-extension">' + esc(t("settings.openExtension")) + "</button>" +
+        '<button class="btn btn-ghost btn-sm" data-action="extension-reloaded">' + esc(t("update.extensionDone")) + "</button></div>";
+    }
+    el.innerHTML = html;
+    el.hidden = !html;
+  }
+
+  async function downloadUpdate() {
+    if (!state.update || state.update.downloaded || state.update.downloading) return;
+    state.update.downloading = true;
+    renderNotice();
+    try {
+      await act("download-update");
+      state.update.downloaded = true;
+    } catch (err) {
+      state.update.downloaded = false;
+      toastError(err);
+    } finally {
+      state.update.downloading = false;
+      renderNotice();
+    }
+  }
+
+  async function checkUpdate(manual) {
+    try {
+      const info = await api("/api/update");
+      state.update = info && info.available ? info : null;
+      renderNotice();
+      if (state.update && !state.update.downloaded) downloadUpdate();
+      if (manual) toast(state.update ? t("update.availableToast", { version: info.latest }) : t("update.upToDate"));
+    } catch (err) {
+      if (manual) toastError(err);
+    }
   }
 
   async function loadPomodoro() {
@@ -586,6 +638,7 @@
   function render() {
     updateNav();
     updateChrome();
+    renderNotice();
     if (state.fatal) {
       view.innerHTML = renderFatal(state.fatal);
       return;
@@ -1322,7 +1375,7 @@
       '<div class="setting-row"><div class="setting-text"><b>' + esc(t("settings.openFolder")) + "</b><span>" + esc(t("settings.openFolderDesc")) + "</span></div>" +
         '<div class="setting-control"><button class="btn btn-sm" data-action="open-folder">' + icon("folder") + "</button></div></div>" +
       '<div class="setting-row"><div class="setting-text"><b>' + esc(t("settings.update")) + "</b><span>" + esc(t("settings.updateDesc")) + "</span></div>" +
-        '<div class="setting-control"><button class="btn btn-sm" data-action="update">' + icon("external") + "</button></div></div></div>";
+        '<div class="setting-control"><button class="btn btn-sm" data-action="check-update">' + icon("refresh") + "</button></div></div></div>";
 
     const danger = '<div class="card danger-zone"><div class="card-head"><div><div class="card-title">' + icon("alert") + esc(t("settings.danger")) + "</div>" +
       '<div class="card-sub">' + esc(t("settings.wipeDesc")) + "</div></div></div>" +
@@ -1642,10 +1695,38 @@
           toastError(err);
         }
         break;
-      case "update":
+      case "check-update":
+        await checkUpdate(true);
+        break;
+      case "install-update":
+        if (state.updating) break;
+        state.updating = true;
+        toast(t("update.downloading"));
         try {
-          await act("update");
-          toast(t("settings.updater"));
+          const info = await act("install-update");
+          toast(t("update.installing", { version: info.latest || "" }));
+        } catch (err) {
+          state.updating = false;
+          toastError(err);
+        }
+        break;
+      case "dismiss-update":
+        state.update = null;
+        renderNotice();
+        break;
+      case "extension-reloaded":
+        try {
+          await act("extension-reloaded");
+          state.settings.extensionReloadNeeded = false;
+          renderNotice();
+          toast(t("update.extensionDoneToast"));
+        } catch (err) {
+          toastError(err);
+        }
+        break;
+      case "open-extension":
+        try {
+          await act("open-extension");
         } catch (err) {
           toastError(err);
         }
@@ -2036,3 +2117,4 @@
     boot();
   }
 })();
+

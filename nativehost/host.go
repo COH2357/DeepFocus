@@ -44,6 +44,7 @@ type response struct {
 	RemainingSeconds int             `json:"remainingSeconds,omitempty"`
 	WithinLimit      bool            `json:"withinLimit,omitempty"`
 	Until            int64           `json:"until,omitempty"`
+	Quotes           []string        `json:"quotes,omitempty"`
 	Config           *configResponse `json:"config,omitempty"`
 }
 
@@ -117,7 +118,7 @@ func handle(req request) response {
 	if req.Browser == "" {
 		req.Browser = "chrome"
 	}
-	if req.Type != "navigation" && req.Type != "heartbeat" && req.Type != "hello" && req.Type != "request_access" && req.Type != "allowance_ended" && req.Type != "status" {
+	if req.Type != "navigation" && req.Type != "heartbeat" && req.Type != "hello" && req.Type != "request_access" && req.Type != "allowance_ended" && req.Type != "quotes" && req.Type != "status" {
 		return response{OK: false, Error: "unknown message type"}
 	}
 	if req.Type == "request_access" {
@@ -125,6 +126,17 @@ func handle(req request) response {
 	}
 	if req.Type == "allowance_ended" {
 		return allowanceEnded(req)
+	}
+	if req.Type == "quotes" {
+		items, err := storage.ListBlockQuotes()
+		if err != nil {
+			return response{OK: false, Error: err.Error()}
+		}
+		quotes := make([]string, 0, len(items))
+		for _, item := range items {
+			quotes = append(quotes, item.Text)
+		}
+		return response{OK: true, Quotes: quotes}
 	}
 	_ = storage.SetExtensionSeen(strings.ToLower(req.Browser), req.Version, time.Now())
 	if req.Type == "hello" || req.Type == "heartbeat" || req.Type == "status" {

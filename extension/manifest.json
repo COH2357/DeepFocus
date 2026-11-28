@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "DeepFocus Guard",
   "description": "DeepFocus website supervision bridge",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEArNf9kO8jRvOYdBbBJfYd4PAFCJ3L8LVntXzCFj7yLVmnKcSLB2J1lSA8yzeGTIhHu2v563k262Lfkf/nSBxgxdRv0RghB8HgO25p3U1e/bVzLkqcnJMQSYRApGSJQsrJ26x+Gx10h7GlsLoF8yUTRCwqEtUjB9KWNEEJxj/yg5dwbzv/aVpM0TunPSwSr2fMEU/Cn/Ifv3xPCSPHHuMULTS5KcUI0emoEEt2H/DoEBHQ6NqSHxuAwDN1aYydOVDcCmoIHvXhwpV7cPVSBTn/6SNgjbc+QVpHcBvZSsq6c69Yt3nMuafkk3wuTDcKxEHAeX9CcI3T/hx2UXKsjvqxdQIDAQAB",
   "permissions": [
     "webNavigation",

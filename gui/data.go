@@ -122,38 +122,39 @@ type idleSettings struct {
 }
 
 type settingsData struct {
-	Version           string           `json:"version"`
-	DBPath            string           `json:"dbPath"`
-	InstallDir        string           `json:"installDir"`
-	DaemonRunning     bool             `json:"daemonRunning"`
-	Autostart         bool             `json:"autostart"`
-	Paused            bool             `json:"paused"`
-	RetentionDays     int              `json:"retentionDays"`
-	TrackingInterval  int              `json:"trackingIntervalSeconds"`
-	Whitelist         []string         `json:"whitelist"`
-	CustomBrowsers    []string         `json:"customBrowsers"`
-	Limits            []limitEntry     `json:"limits"`
-	BreakReminder     reminderSettings `json:"breakReminder"`
-	PomodoroMinutes   int              `json:"pomodoroMinutes"`
-	SnoozeMinutes     int              `json:"snoozeMinutes"`
-	Idle              idleSettings     `json:"idle"`
-	RedactTitles      bool             `json:"redactTitles"`
-	MinRetentionDays  int              `json:"minRetentionDays"`
-	MaxRetentionDays  int              `json:"maxRetentionDays"`
-	MaxIdleMinutes    int              `json:"maxIdleMinutes"`
-	MediaDetectionOK  bool             `json:"mediaDetection"`
-	DomainGrouping    bool             `json:"domainGrouping"`
-	CloseToTray       bool             `json:"closeToTray"`
-	KeepHistory       bool             `json:"keepHistory"`
-	ArchiveDir        string           `json:"archiveDir"`
-	ArchiveCount      int              `json:"archiveCount"`
-	ArchiveLatest     string           `json:"archiveLatest"`
-	QuoteCount        int              `json:"quoteCount"`
-	Language          string           `json:"language"`
-	StrongWebMode     bool             `json:"strongWebMode"`
-	WebAllowlist      []string         `json:"webAllowlist"`
-	ExtensionActive   bool             `json:"extensionActive"`
-	ExtensionBrowsers []string         `json:"extensionBrowsers"`
+	Version               string           `json:"version"`
+	DBPath                string           `json:"dbPath"`
+	InstallDir            string           `json:"installDir"`
+	DaemonRunning         bool             `json:"daemonRunning"`
+	Autostart             bool             `json:"autostart"`
+	Paused                bool             `json:"paused"`
+	RetentionDays         int              `json:"retentionDays"`
+	TrackingInterval      int              `json:"trackingIntervalSeconds"`
+	Whitelist             []string         `json:"whitelist"`
+	CustomBrowsers        []string         `json:"customBrowsers"`
+	Limits                []limitEntry     `json:"limits"`
+	BreakReminder         reminderSettings `json:"breakReminder"`
+	PomodoroMinutes       int              `json:"pomodoroMinutes"`
+	SnoozeMinutes         int              `json:"snoozeMinutes"`
+	Idle                  idleSettings     `json:"idle"`
+	RedactTitles          bool             `json:"redactTitles"`
+	MinRetentionDays      int              `json:"minRetentionDays"`
+	MaxRetentionDays      int              `json:"maxRetentionDays"`
+	MaxIdleMinutes        int              `json:"maxIdleMinutes"`
+	MediaDetectionOK      bool             `json:"mediaDetection"`
+	DomainGrouping        bool             `json:"domainGrouping"`
+	CloseToTray           bool             `json:"closeToTray"`
+	KeepHistory           bool             `json:"keepHistory"`
+	ArchiveDir            string           `json:"archiveDir"`
+	ArchiveCount          int              `json:"archiveCount"`
+	ArchiveLatest         string           `json:"archiveLatest"`
+	QuoteCount            int              `json:"quoteCount"`
+	Language              string           `json:"language"`
+	StrongWebMode         bool             `json:"strongWebMode"`
+	WebAllowlist          []string         `json:"webAllowlist"`
+	ExtensionActive       bool             `json:"extensionActive"`
+	ExtensionBrowsers     []string         `json:"extensionBrowsers"`
+	ExtensionReloadNeeded bool             `json:"extensionReloadNeeded"`
 }
 
 func extensionBrowsers() []string {
@@ -203,19 +204,20 @@ func (a *app) settingsSnapshot() settingsData {
 		MaxIdleMinutes:   system.MaxIdleThresholdMinutes,
 		// The audio sampler is Windows-only. On a platform without it the
 		// toggle is hidden rather than silently ineffective.
-		MediaDetectionOK:  mediaDetectionAvailable,
-		DomainGrouping:    storage.GetDomainGrouping(),
-		CloseToTray:       system.GetCloseToTray(),
-		KeepHistory:       storage.GetKeepHistory(),
-		ArchiveDir:        archiveDir,
-		ArchiveCount:      archiveCount,
-		ArchiveLatest:     archiveLatest,
-		QuoteCount:        len(quotes),
-		Language:          system.GetLanguage(),
-		StrongWebMode:     system.GetStrongWebMode(),
-		WebAllowlist:      system.GetWebAllowlist(),
-		ExtensionBrowsers: extensionBrowsers(),
-		ExtensionActive:   len(extensionBrowsers()) > 0,
+		MediaDetectionOK:      mediaDetectionAvailable,
+		DomainGrouping:        storage.GetDomainGrouping(),
+		CloseToTray:           system.GetCloseToTray(),
+		KeepHistory:           storage.GetKeepHistory(),
+		ArchiveDir:            archiveDir,
+		ArchiveCount:          archiveCount,
+		ArchiveLatest:         archiveLatest,
+		QuoteCount:            len(quotes),
+		Language:              system.GetLanguage(),
+		StrongWebMode:         system.GetStrongWebMode(),
+		WebAllowlist:          system.GetWebAllowlist(),
+		ExtensionBrowsers:     extensionBrowsers(),
+		ExtensionActive:       len(extensionBrowsers()) > 0,
+		ExtensionReloadNeeded: a.extensionReload,
 	}
 }
 
@@ -769,6 +771,14 @@ func openDataFolder() error {
 		return err
 	}
 	return exec.Command("explorer.exe", filepath.Dir(dbPath)).Start()
+}
+
+func openExtensionFolder() error {
+	dir := filepath.Join(system.GetInstallDir(), "extension")
+	if _, err := os.Stat(dir); err != nil {
+		return err
+	}
+	return exec.Command("explorer.exe", dir).Start()
 }
 
 func openArchiveFolder() error {

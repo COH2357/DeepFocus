@@ -146,7 +146,14 @@ chrome.webNavigation.onCommitted.addListener((details) => {
 });
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-  if (!message || message.type !== "grant_access") return false;
+  if (!message) return false;
+  if (message.type === "get_quotes") {
+    nativeMessage({ type: "quotes", browser, version: "0.1.2" })
+      .then((reply) => sendResponse(reply || { ok: false }))
+      .catch(() => sendResponse({ ok: false }));
+    return true;
+  }
+  if (message.type !== "grant_access") return false;
   nativeMessage({
     type: "request_access",
     browser,
